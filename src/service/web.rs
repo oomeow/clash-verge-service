@@ -1,5 +1,5 @@
 use super::data::*;
-use anyhow::{Context, Ok, Result};
+use anyhow::{bail, Context, Ok, Result};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use serde::Serialize;
@@ -104,5 +104,12 @@ pub fn stop_clash() -> Result<()> {
 /// 获取clash当前执行信息
 pub fn get_clash() -> Result<ClashStatus> {
     let arc = ClashStatus::global().lock();
-    Ok(arc.clone())
+    if arc.restart_retry_count <= 0 {
+        bail!("clash not executed, retry count exceeded!")
+    }
+    match (arc.info.clone(), arc.restart_retry_count <= 0) {
+        (None, _) => bail!("clash not executed"),
+        (Some(_), true) => bail!("clash not executed, retry count exceeded!"),
+        (Some(_), false) => Ok(arc.clone()),
+    }
 }
