@@ -54,7 +54,7 @@ pub fn init_log_config(log_file_name: &str, limited_size: Option<u64>) {
     let _ = log4rs::init_config(config).unwrap();
 }
 
-#[allow(unused)]
+#[allow(dead_code)]
 pub fn parse_args() {
     let args: Vec<String> = env::args().collect();
     if args.len() != 3 {

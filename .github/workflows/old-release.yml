@@ -1,15 +1,10 @@
-name: Release CI
+name: Old Release CI
 
-on:
-  push:
-    # Sequence of patterns matched against refs/tags
-    tags:
-      - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
-
+on: workflow_dispatch
 permissions: write-all
 
 jobs:
-  release-build:
+  release-update:
     strategy:
       fail-fast: false
       matrix:
@@ -56,6 +51,13 @@ jobs:
         with:
           target: ${{ matrix.target }}
 
+      - name: Update Tag
+        uses: richardsimko/update-tag@v1
+        with:
+          tag_name: ${{ matrix.target }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       # - name: CodeSign
       #   if: matrix.os == 'macos-latest'
       #   run: |
@@ -71,69 +73,26 @@ jobs:
       #     codesign --force -s "${{ secrets.APPLE_SIGNING_IDENTITY }}" --keychain tauri-build.keychain --options runtime target/${{ matrix.target }}/release/install-service
       #     codesign --force -s "${{ secrets.APPLE_SIGNING_IDENTITY }}" --keychain tauri-build.keychain --options runtime target/${{ matrix.target }}/release/uninstall-service
 
-      - name: Generate Artifact (Linux / MacOS)
-        if: matrix.os != 'windows-latest'
-        run: |
-          mkdir -p ${{ github.workspace }}/artifact
-          cp target/${{ matrix.target }}/release/clash-verge-service ${{ github.workspace }}/artifact/clash-verge-service
-          cp target/${{ matrix.target }}/release/install-service ${{ github.workspace }}/artifact/install-service
-          cp target/${{ matrix.target }}/release/uninstall-service ${{ github.workspace }}/artifact/uninstall-service
-          tar -czf clash-verge-service-${{ matrix.target }}.tar.gz ${{ github.workspace }}/artifact
-
-      - name: Generate Artifact (Windows)
+      - name: Release
         if: matrix.os == 'windows-latest'
-        run: |
-          mkdir -p ${{ github.workspace }}/artifact
-          cp target/${{ matrix.target }}/release/clash-verge-service.exe ${{ github.workspace }}/artifact/clash-verge-service.exe
-          cp target/${{ matrix.target }}/release/install-service.exe ${{ github.workspace }}/artifact/install-service.exe
-          cp target/${{ matrix.target }}/release/uninstall-service.exe ${{ github.workspace }}/artifact/uninstall-service.exe
-          tar -czf clash-verge-service-${{ matrix.target }}.tar.gz ${{ github.workspace }}/artifact
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: clash-verge-service-${{ matrix.target }}
-          path: |
-            clash-verge-service-${{ matrix.target }}.tar.gz
-
-  create-prerelease:
-    needs: [release-build]
-    runs-on: ubuntu-latest
-    steps:
-      # - name: Extract tag name
-      #   id: extract_tag
-      #   run: |
-      #     echo "Tag Name: ${GITHUB_REF##*/}"
-
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          registry-url: https://registry.npmjs.org/
-          node-version: lts/*
-
-      - name: Generate Changelog
-        run: npx changelogithub --output CHANGELOG.txt
-        env:
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-
-      - name: Download All Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./artifacts
-
-      - name: Display structure of downloaded files
-        run: ls -R ./artifacts
-
-      - name: Create Pre-Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Clash Verge Service ${{ github.ref_name }}
-          tag_name: ${{ github.ref_name }}
-          body_path: CHANGELOG.txt
+          name: ${{ matrix.target }}
+          tag_name: ${{ matrix.target }}
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
-            ./artifacts/**
+            target/${{ matrix.target }}/release/clash-verge-service.exe
+            target/${{ matrix.target }}/release/install-service.exe
+            target/${{ matrix.target }}/release/uninstall-service.exe
+
+      - name: Release
+        if: matrix.os != 'windows-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ matrix.target }}
+          tag_name: ${{ matrix.target }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            target/${{ matrix.target }}/release/clash-verge-service
+            target/${{ matrix.target }}/release/install-service
+            target/${{ matrix.target }}/release/uninstall-service

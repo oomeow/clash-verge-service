@@ -2,7 +2,6 @@ mod log_config;
 
 #[cfg(not(windows))]
 use anyhow::Error;
-use log_config::{init_log_config, log_expect, parse_args};
 
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 fn main() {
@@ -12,6 +11,7 @@ fn main() {
 
 #[cfg(target_os = "macos")]
 fn main() -> Result<(), Error> {
+    use log_config::{init_log_config, log_expect, parse_args};
     use std::fs::File;
     use std::io::Write;
     use std::path::Path;
@@ -33,7 +33,10 @@ fn main() -> Result<(), Error> {
         std::process::exit(2);
     }
     if !target_binary_dir.exists() {
-        log::debug!("Create directory for service file [{}].", target_binary_dir);
+        log::debug!(
+            "Create directory for service file [{}].",
+            target_binary_dir.display()
+        );
         log_expect(
             std::fs::create_dir(target_binary_dir),
             "Unable to create directory for service file",
@@ -42,7 +45,7 @@ fn main() -> Result<(), Error> {
 
     log::debug!(
         "Copy service file from {} to {}",
-        service_binary_path,
+        service_binary_path.display(),
         target_binary_path
     );
     log_expect(
@@ -137,6 +140,7 @@ fn main() -> Result<(), Error> {
 fn main() -> Result<(), Error> {
     const SERVICE_NAME: &str = "clash-verge-service";
     use core::panic;
+    use log_config::{init_log_config, log_expect, parse_args};
     use std::path::Path;
     use std::{fs::File, io::Write};
 
@@ -240,6 +244,7 @@ fn main() -> Result<(), Error> {
 /// install and start the service
 #[cfg(windows)]
 fn main() -> windows_service::Result<()> {
+    use log_config::{init_log_config, parse_args};
     use std::ffi::{OsStr, OsString};
     use windows_service::{
         service::{
