@@ -1,13 +1,19 @@
 use super::data::*;
-use anyhow::{bail, Context, Ok, Result};
+use crate::log_config::{init_log_config, log_expect};
+use anyhow::{bail, Result};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
+use regex::Regex;
 use serde::Serialize;
+use shared_child::SharedChild;
 use std::collections::HashMap;
-use std::fs::File;
-use std::process::Command;
-use std::sync::Arc;
+use std::io::{BufRead, BufReader};
+use std::path::Path;
+use std::process::{Command, Stdio};
+use std::sync::{Arc, RwLock};
+use std::thread::spawn;
 use sysinfo::System;
+
 #[derive(Debug, Serialize, Clone)]
 pub struct ClashStatus {
     pub auto_restart: bool,
@@ -50,22 +56,78 @@ fn run_core(body: StartBody) -> Result<()> {
     let config_dir = body.config_dir.as_str();
     let config_file = body.config_file.as_str();
     let args = vec!["-d", config_dir, "-f", config_file];
-    let log = File::create(body.log_file).context("failed to open log")?;
 
-    let mut child = Command::new(body.bin_path).args(args).stdout(log).spawn()?;
-    tokio::spawn(async move {
-        let _ = child.wait();
+    let mut command = Command::new(body.bin_path);
+    command
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let shared_child = log_expect(SharedChild::spawn(&mut command), "failed to start clash");
+    let child = Arc::new(shared_child);
+    let child_ = child.clone();
+    let guard = Arc::new(RwLock::new(()));
+
+    // spawn a thread to read the stdout of the child process
+    spawn(move || {
+        if let Some(mut output) = child.take_stdout() {
+            let _lock = guard.read().unwrap();
+            let mut reader = BufReader::new(&mut output).lines();
+            while let Some(line) = reader.next() {
+                if let Ok(line) = line {
+                    wrap_mihomo_log(&line);
+                }
+            }
+        }
+    });
+
+    // spawn a thread to wait for the child process to exit
+    spawn(move || {
+        let _ = child_.wait();
         let mut status = ClashStatus::global().lock();
         if status.auto_restart {
             if status.restart_retry_count > 0 {
+                log::debug!(
+                    "[clash-verge-service] mihomo terminated, restart count: {}, try to restart...",
+                    status.restart_retry_count
+                );
                 status.restart_retry_count -= 1;
-                run_core(body_clone).expect("failed to restart clash");
+                if let Err(e) = run_core(body_clone) {
+                    log::error!(
+                        "[clash-verge-service] failed to restart clash: {}, retry count: {}",
+                        e,
+                        status.restart_retry_count
+                    );
+                }
             } else {
+                log::error!("[clash-verge-service] failed to restart clash, retry count exceeded!");
                 panic!("failed to restart clash, retry count exceeded!");
             }
         }
     });
     Ok(())
+}
+
+/// wrap mihomo log to log::info, log::warn, log::error
+fn wrap_mihomo_log(line: &str) {
+    let re = Regex::new(r"level=(\w+)").unwrap();
+    let level = re
+        .captures(line)
+        .and_then(|caps| caps.get(1))
+        .map(|m| m.as_str());
+    match level {
+        Some("info") => {
+            log::info!("[mihomo] {}", line);
+        }
+        Some("warning") => {
+            log::warn!("[mihomo] {}", line);
+        }
+        Some("error") => {
+            log::error!("[mihomo] {}", line);
+        }
+        _ => {
+            log::debug!("[mihomo] {}", line);
+        }
+    }
 }
 
 /// POST /start_clash
@@ -78,6 +140,14 @@ pub fn start_clash(body: StartBody) -> Result<()> {
         arc.auto_restart = true;
         arc.info = Some(body.clone());
     }
+    // get log file path and init log config
+    let log_file_path = body.log_file.clone();
+    let log_file_path = Path::new(&log_file_path);
+    let log_dir = log_file_path.parent().unwrap();
+    std::env::set_var("CLASH_VERGE_SERVICE_LOG_DIR", log_dir);
+    let log_file_name = log_file_path.file_name().unwrap();
+    init_log_config(log_file_name.to_str().unwrap(), None);
+
     run_core(body)?;
 
     Ok(())

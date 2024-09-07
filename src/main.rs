@@ -1,3 +1,4 @@
+mod log_config;
 mod service;
 
 #[cfg(windows)]

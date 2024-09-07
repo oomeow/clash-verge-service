@@ -1,61 +1,97 @@
-#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
-fn main() {
-    panic!("This program is not intended to run on this platform.");
-}
+mod log_config;
+
 #[cfg(not(windows))]
 use anyhow::Error;
+use log_config::{init_log_config, log_expect, parse_args};
+
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+fn main() {
+    log::error!("Unsupported platform");
+    panic!("This program is not intended to run on this platform.");
+}
 
 #[cfg(target_os = "macos")]
 fn main() -> Result<(), Error> {
     use std::{fs::remove_file, path::Path};
 
+    parse_args();
+    let limite_log_file_size = Some(2 * 1024 * 1024);
+    init_log_config("uninstall_service.log", limite_log_file_size);
+
+    log::debug!("Start uninstall Clash Verge Service");
+
     let plist_file = "/Library/LaunchDaemons/io.github.clashverge.helper.plist";
 
     // Unload the service.
-    std::process::Command::new("launchctl")
-        .arg("unload")
-        .arg(plist_file)
-        .output()
-        .expect("Failed to unload service.");
+    log::debug!("Unloading service");
+    log_expect(
+        std::process::Command::new("launchctl")
+            .arg("unload")
+            .arg(plist_file)
+            .output(),
+        "Failed to unload service.",
+    );
 
     // Remove the service file.
+    log::debug!(
+        "Removing service file [/Library/PrivilegedHelperTools/io.github.clashverge.helper]"
+    );
     let service_file = Path::new("/Library/PrivilegedHelperTools/io.github.clashverge.helper");
     if service_file.exists() {
         remove_file(service_file).expect("Failed to remove service file.");
     }
 
     // Remove the plist file.
+    log::debug!("Removing plist file [{}]", plist_file);
     let plist_file = Path::new(plist_file);
     if plist_file.exists() {
         remove_file(plist_file).expect("Failed to remove plist file.");
     }
+
+    log::debug!("Service uninstalled successfully.");
     Ok(())
 }
 #[cfg(target_os = "linux")]
 fn main() -> Result<(), Error> {
     use std::{fs::remove_file, path::Path};
 
+    parse_args();
+    let limite_log_file_size = Some(2 * 1024 * 1024);
+    init_log_config("uninstall_service.log", limite_log_file_size);
+
+    log::debug!("Start uninstall Clash Verge Service");
     const SERVICE_NAME: &str = "clash-verge-service";
 
     // Disable the service
-    std::process::Command::new("systemctl")
-        .arg("disable")
-        .arg(SERVICE_NAME)
-        .arg("--now")
-        .output()
-        .expect("Failed to disable service.");
+    log::debug!("Disabling [{}] service", SERVICE_NAME);
+    log_expect(
+        std::process::Command::new("systemctl")
+            .arg("disable")
+            .arg(SERVICE_NAME)
+            .arg("--now")
+            .output(),
+        "Failed to disable service.",
+    );
 
     // Remove the unit file.
     let unit_file = format!("/etc/systemd/system/{}.service", SERVICE_NAME);
+    log::debug!("Removing unit service file [{}].", unit_file);
     let unit_file = Path::new(&unit_file);
     if unit_file.exists() {
-        remove_file(unit_file).expect("Failed to remove unit file.");
+        log::debug!("Service file exists, removing it");
+        log_expect(remove_file(unit_file), "Failed to remove unit file.");
     }
+    log::debug!("Service file removed");
 
-    std::process::Command::new("systemctl")
-        .arg("daemon-reload")
-        .output()
-        .expect("Failed to reload systemd daemon.");
+    log::debug!("Reloading systemd daemon");
+    log_expect(
+        std::process::Command::new("systemctl")
+            .arg("daemon-reload")
+            .output(),
+        "Failed to reload systemd daemon.",
+    );
+
+    log::debug!("Service uninstalled successfully.");
     Ok(())
 }
 
@@ -68,21 +104,34 @@ fn main() -> windows_service::Result<()> {
         service_manager::{ServiceManager, ServiceManagerAccess},
     };
 
+    parse_args();
+    let limite_log_file_size = Some(2 * 1024 * 1024);
+    init_log_config("install_service.log", limite_log_file_size);
+
+    log::debug!("Start uninstall Clash Verge Service.");
+
+    log::debug!("Connecting to service manager.");
     let manager_access = ServiceManagerAccess::CONNECT;
     let service_manager = ServiceManager::local_computer(None::<&str>, manager_access)?;
 
+    log::debug!("Opening existing service.");
     let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE;
     let service = service_manager.open_service("clash_verge_service", service_access)?;
 
+    log::debug!("Checking service status.");
     let service_status = service.query_status()?;
     if service_status.current_state != ServiceState::Stopped {
+        log::debug!("Service status is not stopped, stopping it first.");
         if let Err(err) = service.stop() {
-            eprintln!("{err}");
+            log::error!("Failed to stop service: {}", err);
         }
         // Wait for service to stop
         thread::sleep(Duration::from_secs(1));
     }
 
+    log::debug!("Deleting service");
     service.delete()?;
+
+    log::debug!("Service uninstalled successfully.");
     Ok(())
 }
