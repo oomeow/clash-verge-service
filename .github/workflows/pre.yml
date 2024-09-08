@@ -121,7 +121,9 @@ jobs:
           node-version: lts/*
 
       - name: Generate Changelog
-        run: npx changelogithub --output CHANGELOG.txt
+        run: | 
+          pre_version=$(git tag --sort=-creatordate | grep -Ev "alpha" | sed -n 1p)
+          npx changelogithub --from ${pre_version} --to main --output CHANGELOG.txt
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 

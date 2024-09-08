@@ -118,7 +118,10 @@ jobs:
           node-version: lts/*
 
       - name: Generate Changelog
-        run: npx changelogithub --from $(git tag --sort=-v:refname | grep '^v[0-9]\+\.[0-9]\+\.[0-9]\+' | head -n 1) --to alpha --output CHANGELOG.txt
+        run: |
+          pre_version=$(git tag --sort=-creatordate | grep -Ev "alpha" | sed -n 2p)
+          current_version=${{ github.ref_name }}
+          npx changelogithub --from ${pre_version} --to ${current_version} --output CHANGELOG.txt
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
