@@ -79,7 +79,8 @@ jobs:
           cp target/${{ matrix.target }}/release/clash-verge-service ${{ github.workspace }}/artifact/clash-verge-service
           cp target/${{ matrix.target }}/release/install-service ${{ github.workspace }}/artifact/install-service
           cp target/${{ matrix.target }}/release/uninstall-service ${{ github.workspace }}/artifact/uninstall-service
-          tar -czf clash-verge-service-${{ matrix.target }}.tar.gz ${{ github.workspace }}/artifact
+          cd ${{ github.workspace }}/artifact
+          tar -czf clash-verge-service-${{ matrix.target }}.tar.gz install-service uninstall-service clash-verge-service
 
       - name: Generate Artifact (Windows)
         if: matrix.os == 'windows-latest'
@@ -88,14 +89,15 @@ jobs:
           cp target/${{ matrix.target }}/release/clash-verge-service.exe ${{ github.workspace }}/artifact/clash-verge-service.exe
           cp target/${{ matrix.target }}/release/install-service.exe ${{ github.workspace }}/artifact/install-service.exe
           cp target/${{ matrix.target }}/release/uninstall-service.exe ${{ github.workspace }}/artifact/uninstall-service.exe
-          tar -czf clash-verge-service-${{ matrix.target }}.tar.gz ${{ github.workspace }}/artifact
+          cd ${{ github.workspace }}/artifact
+          tar -czf clash-verge-service-${{ matrix.target }}.tar.gz install-service.exe uninstall-service.exe clash-verge-service.exe
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: clash-verge-service-${{ matrix.target }}
           path: |
-            clash-verge-service-${{ matrix.target }}.tar.gz
+            ${{ github.workspace }}/artifact/clash-verge-service-${{ matrix.target }}.tar.gz
 
   create-pre-release:
     needs: [pre-release-build]
