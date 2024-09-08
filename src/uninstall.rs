@@ -51,6 +51,7 @@ fn main() -> Result<(), Error> {
     log::debug!("Service uninstalled successfully.");
     Ok(())
 }
+
 #[cfg(target_os = "linux")]
 fn main() -> Result<(), Error> {
     use log_config::{init_log_config, log_expect, parse_args};

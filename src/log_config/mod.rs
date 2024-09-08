@@ -9,10 +9,10 @@ use log4rs::{
 };
 
 fn get_log_dir() -> PathBuf {
-    let log_dir = std::env::var("CLASH_VERGE_SERVICE_LOG_DIR").unwrap_or_else(|e| {
-        log::error!("Unable to get log dir: {}", e);
-        panic!("Unable to get log dir");
-    });
+    let log_dir = log_expect(
+        std::env::var("CLASH_VERGE_SERVICE_LOG_DIR"),
+        "Unable to get log dir",
+    );
     log_dir.into()
 }
 
@@ -27,7 +27,7 @@ pub fn init_log_config(log_file_name: &str, limited_size: Option<u64>) {
     let log_file = get_log_file_path(log_file_name);
     if log_file.exists() && limited_size.is_some() {
         let metadata = fs::metadata(log_file.clone()).unwrap();
-        if metadata.len() > limited_size.unwrap() {
+        if metadata.len() >= limited_size.unwrap() {
             let _ = fs::rename(log_file.clone(), log_file.with_extension("old.log"));
         }
     }
@@ -54,17 +54,17 @@ pub fn init_log_config(log_file_name: &str, limited_size: Option<u64>) {
     let _ = log4rs::init_config(config).unwrap();
 }
 
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn parse_args() {
     let args: Vec<String> = env::args().collect();
     if args.len() != 3 {
-        log::error!("accept only 1 argument: --log-dir, but got error arguments");
-        panic!("accept only 1 argument: --log-dir, but got error arguments");
+        log::error!("too many arguments, only the --log-dir is allowed");
+        panic!("too many arguments, only the --log-dir is allowed");
     } else {
         let arg = &args[1];
         if arg != "--log-dir" {
-            log::error!("accept only 1 argument: --log-dir, but got {}", arg);
-            panic!("accept only 1 argument: --log-dir, but got {}", arg);
+            log::error!("--log-dir argument is required");
+            panic!("--log-dir argument is required");
         } else {
             let val = &args[2];
             std::env::set_var("CLASH_VERGE_SERVICE_LOG_DIR", val);
