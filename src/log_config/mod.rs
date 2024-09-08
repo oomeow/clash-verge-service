@@ -57,19 +57,24 @@ pub fn init_log_config(log_file_name: &str, limited_size: Option<u64>) {
 #[allow(unused)]
 pub fn parse_args() {
     let args: Vec<String> = env::args().collect();
-    if args.len() != 3 {
-        log::error!("too many arguments, only the --log-dir is allowed");
-        panic!("too many arguments, only the --log-dir is allowed");
-    } else {
-        let arg = &args[1];
-        if arg != "--log-dir" {
-            log::error!("--log-dir argument is required");
-            panic!("--log-dir argument is required");
-        } else {
-            let val = &args[2];
-            std::env::set_var("CLASH_VERGE_SERVICE_LOG_DIR", val);
-        }
+    if args.len() < 3 {
+        log::error!("--log-dir argument is required");
+        panic!("--log-dir argument is required");
     }
+    if args.len() > 3 {
+        log::error!("too many arguments, only the --log-dir is allowed");
+        panic!(
+            "too many arguments, only the --log-dir is allowed, {:?}",
+            args
+        );
+    }
+    let arg = &args[1];
+    if arg != "--log-dir" {
+        log::error!("only the --log-dir argument is allowed");
+        panic!("only the --log-dir argument is allowed");
+    }
+    let val = &args[2];
+    std::env::set_var("CLASH_VERGE_SERVICE_LOG_DIR", val);
 }
 
 pub fn log_expect<T, E>(result: Result<T, E>, msg: &str) -> T
