@@ -2,6 +2,8 @@ name: Pre Release CI
 
 on:
   push:
+    branches: [ main ]
+    tags-ignore: "*"
 
 concurrency:
   group: alpha-${{ github.ref }}
