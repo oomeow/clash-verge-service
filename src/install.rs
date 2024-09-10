@@ -1,7 +1,6 @@
 mod log_config;
 
 use anyhow::Error;
-use anyhow::bail;
 
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 fn main() {
@@ -16,14 +15,8 @@ fn main() -> Result<(), Error> {
     use std::io::Write;
     use std::path::Path;
 
-    match parse_args() {
-        Some(log_dir) => {
-            LogConfig::global().init(Some(log_dir))?;
-        }
-        None => {
-            bail!("Unable to parse log directory from arguments");
-        }
-    }
+    let log_dir = parse_args();
+    LogConfig::global().init(log_dir)?;
 
     log::debug!("Start install Clash Verge Service.");
 
@@ -149,14 +142,8 @@ fn main() -> Result<(), Error> {
     use std::path::Path;
     use std::{fs::File, io::Write};
 
-    match parse_args() {
-        Some(log_dir) => {
-            LogConfig::global().init(Some(log_dir))?;
-        }
-        None => {
-            bail!("Unable to parse log directory from arguments");
-        }
-    }
+    let log_dir = parse_args();
+    LogConfig::global().init(log_dir)?;
 
     log::debug!("Start install Clash Verge Service.");
     let service_binary_path = std::env::current_exe()
@@ -264,14 +251,8 @@ fn main() -> Result<(), Error> {
         service_manager::{ServiceManager, ServiceManagerAccess},
     };
 
-    match parse_args() {
-        Some(log_dir) => {
-            LogConfig::global().init(Some(log_dir))?;
-        }
-        None => {
-            bail!("Unable to parse log directory from arguments");
-        }
-    }
+    let log_dir = parse_args();
+    LogConfig::global().init(log_dir)?;
 
     log::debug!("Start installing Clash Verge Service.");
 

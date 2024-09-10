@@ -201,8 +201,7 @@ impl LogConfig {
 #[allow(unused)]
 pub fn parse_args() -> Option<PathBuf> {
     let args: Vec<String> = env::args().collect();
-    if args.len() < 3 {
-        eprintln!("--log-dir argument is required");
+    if args.len() < 2 {
         return None;
     }
     if args.len() > 3 {
@@ -211,8 +210,7 @@ pub fn parse_args() -> Option<PathBuf> {
     }
     let arg = &args[1];
     if arg != "--log-dir" {
-        eprintln!("only the --log-dir argument is allowed");
-        return None;
+        panic!("only the --log-dir argument is allowed");
     }
     let val = &args[2];
     Some(PathBuf::from(val))

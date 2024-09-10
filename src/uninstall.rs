@@ -1,7 +1,6 @@
 mod log_config;
 
 use anyhow::Error;
-use anyhow::bail;
 
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 fn main() {
@@ -14,14 +13,8 @@ fn main() -> Result<(), Error> {
     use log_config::{log_expect, parse_args, LogConfig};
     use std::{fs::remove_file, path::Path};
 
-    match parse_args() {
-        Some(log_dir) => {
-            LogConfig::global().init(Some(log_dir))?;
-        }
-        None => {
-            bail!("Unable to parse log directory from arguments");
-        }
-    }
+    let log_dir = parse_args();
+    LogConfig::global().init(log_dir)?;
 
     log::debug!("Start uninstall Clash Verge Service");
 
@@ -62,14 +55,8 @@ fn main() -> Result<(), Error> {
     use log_config::{log_expect, parse_args, LogConfig};
     use std::{fs::remove_file, path::Path};
 
-    match parse_args() {
-        Some(log_dir) => {
-            LogConfig::global().init(Some(log_dir))?;
-        }
-        None => {
-            bail!("Unable to parse log directory from arguments");
-        }
-    }
+    let log_dir = parse_args();
+    LogConfig::global().init(log_dir)?;
 
     log::debug!("Start uninstall Clash Verge Service");
     const SERVICE_NAME: &str = "clash-verge-service";
@@ -117,14 +104,8 @@ fn main() -> Result<(), Error> {
         service_manager::{ServiceManager, ServiceManagerAccess},
     };
 
-    match parse_args() {
-        Some(log_dir) => {
-            LogConfig::global().init(Some(log_dir))?;
-        }
-        None => {
-            bail!("Unable to parse log directory from arguments");
-        }
-    }
+    let log_dir = parse_args();
+    LogConfig::global().init(log_dir)?;
 
     log::debug!("Start uninstall Clash Verge Service.");
 
