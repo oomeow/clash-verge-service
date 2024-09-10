@@ -1,5 +1,5 @@
 use super::data::*;
-use crate::log_config::{init_log_config, log_expect};
+use crate::log_config::{log_expect, LogConfig};
 use anyhow::{bail, Result};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
@@ -8,7 +8,7 @@ use serde::Serialize;
 use shared_child::SharedChild;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
-use std::path::Path;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::{Arc, RwLock};
 use std::thread::spawn;
@@ -115,17 +115,20 @@ fn wrap_mihomo_log(line: &str) {
         .and_then(|caps| caps.get(1))
         .map(|m| m.as_str());
     match level {
-        Some("info") => {
-            log::info!("[mihomo] {}", line);
+        Some("error") => {
+            log::error!(target: "mihomo", "[mihomo] {}", line);
         }
         Some("warning") => {
-            log::warn!("[mihomo] {}", line);
+            log::warn!(target: "mihomo", "[mihomo] {}", line);
         }
-        Some("error") => {
-            log::error!("[mihomo] {}", line);
+        Some("info") => {
+            log::info!(target: "mihomo", "[mihomo] {}", line);
+        }
+        Some("debug") => {
+            log::debug!(target: "mihomo", "[mihomo] {}", line);
         }
         _ => {
-            log::debug!("[mihomo] {}", line);
+            log::debug!(target: "mihomo", "[mihomo] {}", line);
         }
     }
 }
@@ -142,11 +145,10 @@ pub fn start_clash(body: StartBody) -> Result<()> {
     }
     // get log file path and init log config
     let log_file_path = body.log_file.clone();
-    let log_file_path = Path::new(&log_file_path);
-    let log_dir = log_file_path.parent().unwrap();
-    std::env::set_var("CLASH_VERGE_SERVICE_LOG_DIR", log_dir);
-    let log_file_name = log_file_path.file_name().unwrap();
-    init_log_config(log_file_name.to_str().unwrap(), None);
+    let log_file_path = PathBuf::from(log_file_path);
+    let log_dir = log_file_path.parent().unwrap().to_path_buf();
+    let log_file_name = log_file_path.file_name().unwrap().to_str().unwrap();
+    LogConfig::global().update_config(log_file_name, log_dir, None)?;
 
     run_core(body)?;
 
@@ -178,8 +180,21 @@ pub fn get_clash() -> Result<ClashStatus> {
         bail!("clash not executed, retry count exceeded!")
     }
     match (arc.info.clone(), arc.restart_retry_count <= 0) {
-        (None, _) => bail!("clash not executed"),
-        (Some(_), true) => bail!("clash not executed, retry count exceeded!"),
         (Some(_), false) => Ok(arc.clone()),
+        (Some(_), true) => bail!("clash terminated, retry count exceeded!"),
+        (None, _) => bail!("clash not executed"),
+    }
+}
+
+pub fn update_log_level(body: LogLevelBody) -> Result<()> {
+    let log_level = body.level;
+    match log_level.as_str() {
+        "off" => LogConfig::global().update_log_level(log::LevelFilter::Off),
+        "error" => LogConfig::global().update_log_level(log::LevelFilter::Error),
+        "warn" => LogConfig::global().update_log_level(log::LevelFilter::Warn),
+        "info" => LogConfig::global().update_log_level(log::LevelFilter::Info),
+        "debug" => LogConfig::global().update_log_level(log::LevelFilter::Debug),
+        "trace" => LogConfig::global().update_log_level(log::LevelFilter::Trace),
+        _ => bail!("invalid log level"),
     }
 }

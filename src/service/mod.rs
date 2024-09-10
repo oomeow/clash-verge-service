@@ -71,28 +71,34 @@ pub async fn run_service() -> anyhow::Result<()> {
         .map(move || wrap_response!(get_version()));
 
     let api_start_clash = warp::post()
-        .and(warp::path("start_clash"))
+        .and(warp::path("clash"))
         .and(warp::body::json())
         .map(move |body: StartBody| wrap_response!(start_clash(body)));
 
-    let api_stop_clash = warp::post()
-        .and(warp::path("stop_clash"))
-        .map(move || wrap_response!(stop_clash()));
-
     let api_get_clash = warp::get()
-        .and(warp::path("get_clash"))
+        .and(warp::path("clash"))
         .map(move || wrap_response!(get_clash()));
 
-    let api_stop_service = warp::post()
-        .and(warp::path("stop_service"))
+    let api_stop_clash = warp::delete()
+        .and(warp::path("clash"))
+        .map(move || wrap_response!(stop_clash()));
+
+    let api_update_log_level = warp::put()
+        .and(warp::path("loglevel"))
+        .and(warp::body::json())
+        .map(|body: LogLevelBody| wrap_response!(update_log_level(body)));
+
+    let api_stop_service = warp::delete()
+        .and(warp::path("service"))
         .map(|| wrap_response!(stop_service()));
 
     warp::serve(
         api_get_version
             .or(api_start_clash)
+            .or(api_get_clash)
             .or(api_stop_clash)
-            .or(api_stop_service)
-            .or(api_get_clash),
+            .or(api_update_log_level)
+            .or(api_stop_service),
     )
     .run(([127, 0, 0, 1], LISTEN_PORT))
     .await;

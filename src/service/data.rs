@@ -13,6 +13,13 @@ pub struct StartBody {
     pub log_file: String,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct LogLevelBody {
+    pub level: String,
+    // Is there a need to create a log level for mihomo?
+    // pub mihomo_level: String,
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct JsonResponse<T: Serialize> {
     pub code: u64,
