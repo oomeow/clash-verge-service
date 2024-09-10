@@ -11,14 +11,20 @@ fn main() {
 
 #[cfg(target_os = "macos")]
 fn main() -> Result<(), Error> {
-    use log_config::{init_log_config, log_expect, parse_args};
+    use log_config::{log_expect, parse_args, LogConfig};
+    use anyhow::bail;
     use std::fs::File;
     use std::io::Write;
     use std::path::Path;
 
-    parse_args();
-    let limite_log_file_size = Some(2 * 1024 * 1024);
-    init_log_config("install_service.log", limite_log_file_size);
+    match parse_args() {
+        Some(log_dir) => {
+            LogConfig::global().init(Some(log_dir))?;
+        }
+        None => {
+            bail!("Unable to parse log directory from arguments");
+        }
+    }
 
     log::debug!("Start install Clash Verge Service.");
 
@@ -139,14 +145,20 @@ fn main() -> Result<(), Error> {
 #[cfg(target_os = "linux")]
 fn main() -> Result<(), Error> {
     const SERVICE_NAME: &str = "clash-verge-service";
+    use anyhow::bail;
     use core::panic;
-    use log_config::{init_log_config, log_expect, parse_args};
+    use log_config::{log_expect, parse_args, LogConfig};
     use std::path::Path;
     use std::{fs::File, io::Write};
 
-    parse_args();
-    let limite_log_file_size = Some(2 * 1024 * 1024);
-    init_log_config("install_service.log", limite_log_file_size);
+    match parse_args() {
+        Some(log_dir) => {
+            LogConfig::global().init(Some(log_dir))?;
+        }
+        None => {
+            bail!("Unable to parse log directory from arguments");
+        }
+    }
 
     log::debug!("Start install Clash Verge Service.");
     let service_binary_path = std::env::current_exe()
@@ -244,7 +256,8 @@ fn main() -> Result<(), Error> {
 /// install and start the service
 #[cfg(windows)]
 fn main() -> windows_service::Result<()> {
-    use log_config::{init_log_config, parse_args};
+    use log_config::{log_expect, parse_args, LogConfig};
+    use anyhow::bail;
     use std::ffi::{OsStr, OsString};
     use windows_service::{
         service::{
@@ -254,9 +267,14 @@ fn main() -> windows_service::Result<()> {
         service_manager::{ServiceManager, ServiceManagerAccess},
     };
 
-    parse_args();
-    let limite_log_file_size = Some(2 * 1024 * 1024);
-    init_log_config("install_service.log", limite_log_file_size);
+    match parse_args() {
+        Some(log_dir) => {
+            LogConfig::global().init(Some(log_dir))?;
+        }
+        None => {
+            bail!("Unable to parse log directory from arguments");
+        }
+    }
 
     log::debug!("Start installing Clash Verge Service.");
 

@@ -11,12 +11,18 @@ fn main() {
 
 #[cfg(target_os = "macos")]
 fn main() -> Result<(), Error> {
-    use log_config::{init_log_config, log_expect, parse_args};
+    use anyhow::bail;
+    use log_config::{log_expect, parse_args, LogConfig};
     use std::{fs::remove_file, path::Path};
 
-    parse_args();
-    let limite_log_file_size = Some(2 * 1024 * 1024);
-    init_log_config("uninstall_service.log", limite_log_file_size);
+    match parse_args() {
+        Some(log_dir) => {
+            LogConfig::global().init(Some(log_dir))?;
+        }
+        None => {
+            bail!("Unable to parse log directory from arguments");
+        }
+    }
 
     log::debug!("Start uninstall Clash Verge Service");
 
@@ -54,12 +60,18 @@ fn main() -> Result<(), Error> {
 
 #[cfg(target_os = "linux")]
 fn main() -> Result<(), Error> {
-    use log_config::{init_log_config, log_expect, parse_args};
+    use anyhow::bail;
+    use log_config::{log_expect, parse_args, LogConfig};
     use std::{fs::remove_file, path::Path};
 
-    parse_args();
-    let limite_log_file_size = Some(2 * 1024 * 1024);
-    init_log_config("uninstall_service.log", limite_log_file_size);
+    match parse_args() {
+        Some(log_dir) => {
+            LogConfig::global().init(Some(log_dir))?;
+        }
+        None => {
+            bail!("Unable to parse log directory from arguments");
+        }
+    }
 
     log::debug!("Start uninstall Clash Verge Service");
     const SERVICE_NAME: &str = "clash-verge-service";
@@ -100,16 +112,22 @@ fn main() -> Result<(), Error> {
 /// stop and uninstall the service
 #[cfg(windows)]
 fn main() -> windows_service::Result<()> {
-    use log_config::{init_log_config, parse_args};
+    use anyhow::bail;
+    use log_config::{log_expect, parse_args, LogConfig};
     use std::{thread, time::Duration};
     use windows_service::{
         service::{ServiceAccess, ServiceState},
         service_manager::{ServiceManager, ServiceManagerAccess},
     };
 
-    parse_args();
-    let limite_log_file_size = Some(2 * 1024 * 1024);
-    init_log_config("install_service.log", limite_log_file_size);
+    match parse_args() {
+        Some(log_dir) => {
+            LogConfig::global().init(Some(log_dir))?;
+        }
+        None => {
+            bail!("Unable to parse log directory from arguments");
+        }
+    }
 
     log::debug!("Start uninstall Clash Verge Service.");
 
