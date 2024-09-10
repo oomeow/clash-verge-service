@@ -1,7 +1,7 @@
 mod log_config;
 
-#[cfg(not(windows))]
 use anyhow::Error;
+use anyhow::bail;
 
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 fn main() {
@@ -12,7 +12,6 @@ fn main() {
 #[cfg(target_os = "macos")]
 fn main() -> Result<(), Error> {
     use log_config::{log_expect, parse_args, LogConfig};
-    use anyhow::bail;
     use std::fs::File;
     use std::io::Write;
     use std::path::Path;
@@ -145,7 +144,6 @@ fn main() -> Result<(), Error> {
 #[cfg(target_os = "linux")]
 fn main() -> Result<(), Error> {
     const SERVICE_NAME: &str = "clash-verge-service";
-    use anyhow::bail;
     use core::panic;
     use log_config::{log_expect, parse_args, LogConfig};
     use std::path::Path;
@@ -255,9 +253,8 @@ fn main() -> Result<(), Error> {
 
 /// install and start the service
 #[cfg(windows)]
-fn main() -> windows_service::Result<()> {
-    use log_config::{log_expect, parse_args, LogConfig};
-    use anyhow::bail;
+fn main() -> Result<(), Error> {
+    use log_config::{parse_args, LogConfig};
     use std::ffi::{OsStr, OsString};
     use windows_service::{
         service::{

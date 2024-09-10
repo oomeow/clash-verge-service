@@ -218,6 +218,7 @@ pub fn parse_args() -> Option<PathBuf> {
     Some(PathBuf::from(val))
 }
 
+#[allow(unused)]
 pub fn log_expect<T, E>(result: Result<T, E>, msg: &str) -> T
 where
     E: std::fmt::Display,

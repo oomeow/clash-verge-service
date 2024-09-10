@@ -1,7 +1,7 @@
 mod log_config;
 
-#[cfg(not(windows))]
 use anyhow::Error;
+use anyhow::bail;
 
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 fn main() {
@@ -11,7 +11,6 @@ fn main() {
 
 #[cfg(target_os = "macos")]
 fn main() -> Result<(), Error> {
-    use anyhow::bail;
     use log_config::{log_expect, parse_args, LogConfig};
     use std::{fs::remove_file, path::Path};
 
@@ -60,7 +59,6 @@ fn main() -> Result<(), Error> {
 
 #[cfg(target_os = "linux")]
 fn main() -> Result<(), Error> {
-    use anyhow::bail;
     use log_config::{log_expect, parse_args, LogConfig};
     use std::{fs::remove_file, path::Path};
 
@@ -111,9 +109,8 @@ fn main() -> Result<(), Error> {
 
 /// stop and uninstall the service
 #[cfg(windows)]
-fn main() -> windows_service::Result<()> {
-    use anyhow::bail;
-    use log_config::{log_expect, parse_args, LogConfig};
+fn main() -> Result<(), Error> {
+    use log_config::{parse_args, LogConfig};
     use std::{thread, time::Duration};
     use windows_service::{
         service::{ServiceAccess, ServiceState},
