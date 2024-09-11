@@ -2,9 +2,9 @@
 name = "clash-verge-service"
 version = "1.0.0"
 edition = "2021"
-authors = ["zzzgydi", "Clash Verge Rev Team"]
+authors = ["oomeow", "Clash Verge Rev Team"]
 license = "GPL-3.0"
-repository = "https://github.com/zzzgydi/clash-verge-service.git"
+repository = "https://github.com/oomeow/clash-verge-service.git"
 
 [[bin]]
 name = "clash-verge-service"
