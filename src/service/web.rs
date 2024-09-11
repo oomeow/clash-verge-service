@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::thread::spawn;
 use sysinfo::System;
 
@@ -76,19 +76,24 @@ fn run_core(body: StartBody) -> Result<()> {
                 }
             }
         }
+        log::trace!("[clash-verge-service] exited old read core log thread");
     });
 
     // spawn a thread to wait for the child process to exit
     spawn(move || {
         let _ = child_.wait();
-        let mut status = ClashStatus::global().lock();
+        let status = ClashStatus::global().lock().clone();
         if status.auto_restart {
             if status.restart_retry_count > 0 {
                 log::warn!(
                     "[clash-verge-service] mihomo terminated, restart count: {}, try to restart...",
                     status.restart_retry_count
                 );
-                status.restart_retry_count -= 1;
+                // update the restart retry count
+                {
+                    let mut cs = ClashStatus::global().lock();
+                    cs.restart_retry_count = status.restart_retry_count - 1;
+                }
                 if let Err(e) = run_core(body_clone) {
                     log::error!(
                         "[clash-verge-service] failed to restart clash: {}, retry count: {}",
@@ -101,6 +106,7 @@ fn run_core(body: StartBody) -> Result<()> {
                 panic!("failed to restart clash, retry count exceeded!");
             }
         }
+        log::trace!("[clash-verge-service] exited old restart core thread");
     });
     Ok(())
 }
@@ -126,6 +132,7 @@ fn wrap_mihomo_log(line: &str) {
 /// 启动clash进程
 pub fn start_clash(body: StartBody) -> Result<()> {
     // stop the old clash bin
+    log::debug!("[clash-verge-service] start clash");
     stop_clash()?;
     {
         let mut arc = ClashStatus::global().lock();
@@ -137,10 +144,12 @@ pub fn start_clash(body: StartBody) -> Result<()> {
     let log_file_path = PathBuf::from(log_file_path);
     let log_dir = log_file_path.parent().unwrap().to_path_buf();
     let log_file_name = log_file_path.file_name().unwrap().to_str().unwrap();
+    log::debug!("[clash-verge-service] update log config");
     LogConfig::global()
         .lock()
         .update_config(log_file_name, log_dir, None)?;
 
+    log::debug!("[clash-verge-service] run clash core");
     run_core(body)?;
 
     Ok(())
@@ -149,6 +158,8 @@ pub fn start_clash(body: StartBody) -> Result<()> {
 /// POST /stop_clash
 /// 停止clash进程
 pub fn stop_clash() -> Result<()> {
+    log::debug!("[clash-verge-service] stop clash");
+    // reset the clash status
     {
         let mut arc = ClashStatus::global().lock();
         *arc = ClashStatus::default();
@@ -157,6 +168,7 @@ pub fn stop_clash() -> Result<()> {
     let mut system = System::new();
     system.refresh_all();
     let procs = system.processes_by_name("verge-mihomo".as_ref());
+    log::debug!("[clash-verge-service] kill verge-mihomo process");
     for proc in procs {
         proc.kill();
     }
@@ -179,25 +191,15 @@ pub fn get_clash() -> Result<ClashStatus> {
 
 pub fn update_log_level(body: LogLevelBody) -> Result<()> {
     let log_level = body.level;
-    match log_level.as_str() {
-        "off" => LogConfig::global()
-            .lock()
-            .update_log_level(log::LevelFilter::Off),
-        "error" => LogConfig::global()
-            .lock()
-            .update_log_level(log::LevelFilter::Error),
-        "warn" => LogConfig::global()
-            .lock()
-            .update_log_level(log::LevelFilter::Warn),
-        "info" => LogConfig::global()
-            .lock()
-            .update_log_level(log::LevelFilter::Info),
-        "debug" => LogConfig::global()
-            .lock()
-            .update_log_level(log::LevelFilter::Debug),
-        "trace" => LogConfig::global()
-            .lock()
-            .update_log_level(log::LevelFilter::Trace),
+    let log_level = match log_level.as_str() {
+        "off" => log::LevelFilter::Off,
+        "error" => log::LevelFilter::Error,
+        "warn" => log::LevelFilter::Warn,
+        "info" => log::LevelFilter::Info,
+        "debug" => log::LevelFilter::Debug,
+        "trace" => log::LevelFilter::Trace,
         _ => bail!("invalid log level"),
-    }
+    };
+    LogConfig::global().lock().update_log_level(log_level)?;
+    Ok(())
 }
