@@ -13,86 +13,88 @@ use parking_lot::Mutex;
 
 #[derive(Debug, Clone)]
 pub struct LogConfig {
-    log_file_name: Arc<Mutex<String>>,
-    log_dir: Arc<Mutex<Option<PathBuf>>>,
-    limited_file_size: Arc<Mutex<Option<u64>>>,
-    log_level: Arc<Mutex<Option<LevelFilter>>>,
-    log_handle: Arc<Mutex<Option<Handle>>>,
+    log_file_name: String,
+    log_dir: Option<PathBuf>,
+    limited_file_size: Option<u64>,
+    log_level: Option<LevelFilter>,
+    log_handle: Option<Handle>,
 }
 
 impl Default for LogConfig {
     fn default() -> Self {
         Self {
-            log_file_name: Arc::new(Mutex::new("clash-verge-service.log".to_string())),
-            log_dir: Arc::new(Mutex::new(None)),
-            limited_file_size: Arc::new(Mutex::new(Some(2 * 1024 * 1024))),
-            log_level: Arc::new(Mutex::new(Some(LevelFilter::Debug))),
-            log_handle: Arc::new(Mutex::new(None)),
+            log_file_name: "clash-verge-service.log".to_string(),
+            log_dir: None,
+            limited_file_size: Some(2 * 1024 * 1024),
+            log_level: Some(LevelFilter::Debug),
+            log_handle: None,
         }
     }
 }
 
 impl LogConfig {
-    pub fn global() -> &'static LogConfig {
-        static LOGCONFIG: OnceCell<LogConfig> = OnceCell::new();
+    pub fn global() -> &'static Arc<Mutex<LogConfig>> {
+        static LOGCONFIG: OnceCell<Arc<Mutex<LogConfig>>> = OnceCell::new();
 
-        LOGCONFIG.get_or_init(|| LogConfig::default())
+        LOGCONFIG.get_or_init(|| Arc::new(Mutex::new(LogConfig::default())))
     }
 
-    pub fn init(&self, log_dir: Option<PathBuf>) -> Result<()> {
+    pub fn init(&mut self, log_dir: Option<PathBuf>) -> Result<()> {
         let LogConfig {
             log_file_name,
             limited_file_size,
             log_level,
             ..
-        } = Self::default();
+        } = LogConfig::default();
 
-        let log_file_name = log_file_name.lock().clone();
-        let limited_file_size = limited_file_size.lock().clone().map(|v| v);
-        let log_level = log_level.lock().clone().unwrap();
+        let log_file_name = log_file_name.clone();
+        let limited_file_size = limited_file_size.clone().map(|v| v);
+        let log_level = log_level.clone().unwrap();
 
-        let config =
-            Self::create_log_config(&log_file_name, log_dir.clone(), limited_file_size, log_level.clone());
+        let config = Self::create_log_config(
+            &log_file_name,
+            log_dir.clone(),
+            limited_file_size,
+            log_level.clone(),
+        );
 
         if let Some(config) = config {
             let handle = log4rs::init_config(config).unwrap();
 
-            *self.log_dir.lock() = log_dir;
-            *self.log_handle.lock() = Some(handle);
+            self.log_dir = log_dir;
+            self.log_handle = Some(handle);
         }
         Ok(())
     }
 
     #[allow(unused)]
     pub fn update_config(
-        &self,
+        &mut self,
         log_file_name: &str,
         log_dir: PathBuf,
         limited_file_size: Option<u64>,
     ) -> Result<()> {
-        let handle = Self::global().log_handle.lock().clone();
-        if handle.is_none() {
+        let LogConfig {
+            log_file_name: mut c_log_file_name,
+            log_dir: mut c_log_dir,
+            limited_file_size: mut c_limited_file_size,
+            log_handle: mut c_log_handle,
+            log_level: mut c_log_level
+        } = self.clone();
+        if c_log_handle.is_none() {
             log::error!("update log config failed, log handle is none, please init first");
             bail!("update log config failed, log handle is none, please init first");
         }
 
         // check if need to update log config
         let mut need_update = false;
-        let LogConfig {
-            log_file_name: c_log_file_name,
-            log_dir: c_log_dir,
-            limited_file_size: c_limited_file_size,
-            ..
-        } = Self::global();
-        if log_file_name != *c_log_file_name.lock() {
+        if log_file_name != c_log_file_name {
             need_update = true;
         }
-        if !need_update
-            && (c_log_dir.lock().is_none() || log_dir != *c_log_dir.lock().clone().unwrap())
-        {
+        if !need_update && (c_log_dir.is_none() || log_dir != c_log_dir.clone().unwrap()) {
             need_update = true;
         }
-        if !need_update && limited_file_size != *c_limited_file_size.lock() {
+        if !need_update && limited_file_size != c_limited_file_size {
             need_update = true;
         }
         if !need_update {
@@ -100,19 +102,19 @@ impl LogConfig {
             return Ok(());
         }
 
-        let log_level = Self::global().log_level.lock().clone().unwrap();
+        // let log_level = c_log_level.clone().unwrap();
         let config = Self::create_log_config(
             &log_file_name,
             Some(log_dir.clone()),
             limited_file_size,
-            log_level,
+            c_log_level.unwrap(),
         );
         if let Some(config) = config {
-            handle.unwrap().set_config(config);
+            c_log_handle.unwrap().set_config(config);
 
-            *self.log_file_name.lock() = log_file_name.to_string();
-            *self.log_dir.lock() = Some(log_dir);
-            *self.limited_file_size.lock() = limited_file_size;
+            c_log_file_name = log_file_name.to_string();
+            c_log_dir = Some(log_dir);
+            c_limited_file_size = limited_file_size;
         }
         Ok(())
     }
@@ -177,20 +179,20 @@ impl LogConfig {
     }
 
     #[allow(unused)]
-    pub fn update_log_level(&self, log_level: LevelFilter) -> Result<()> {
-        let handle = self.log_handle.lock().clone();
+    pub fn update_log_level(&mut self, log_level: LevelFilter) -> Result<()> {
+        let handle = self.log_handle.clone();
         if handle.is_none() {
             bail!("update log level failed, log handle is none");
         }
         let config = Self::create_log_config(
-            self.log_file_name.lock().clone().as_str(),
-            self.log_dir.lock().clone().map(|v| v),
-            self.limited_file_size.lock().clone(),
+            self.log_file_name.clone().as_str(),
+            self.log_dir.clone().map(|v| v),
+            self.limited_file_size.clone(),
             log_level,
         );
         if let Some(config) = config {
             handle.unwrap().set_config(config);
-            *self.log_level.lock() = Some(log_level);
+            self.log_level = Some(log_level);
         } else {
             bail!("Unable to create log config");
         }
@@ -205,8 +207,7 @@ pub fn parse_args() -> Option<PathBuf> {
         return None;
     }
     if args.len() > 3 {
-        eprintln!("too many arguments, only the --log-dir is allowed");
-        return None;
+        panic!("too many arguments, only the --log-dir is allowed");
     }
     let arg = &args[1];
     if arg != "--log-dir" {

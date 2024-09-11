@@ -86,7 +86,7 @@ fn run_core(body: StartBody) -> Result<()> {
         let mut status = ClashStatus::global().lock();
         if status.auto_restart {
             if status.restart_retry_count > 0 {
-                log::debug!(
+                log::warn!(
                     "[clash-verge-service] mihomo terminated, restart count: {}, try to restart...",
                     status.restart_retry_count
                 );
@@ -113,23 +113,14 @@ fn wrap_mihomo_log(line: &str) {
     let level = re
         .captures(line)
         .and_then(|caps| caps.get(1))
-        .map(|m| m.as_str());
+        .map(|m| m.as_str())
+        .unwrap_or("info");
     match level {
-        Some("error") => {
-            log::error!(target: "mihomo", "[mihomo] {}", line);
-        }
-        Some("warning") => {
-            log::warn!(target: "mihomo", "[mihomo] {}", line);
-        }
-        Some("info") => {
-            log::info!(target: "mihomo", "[mihomo] {}", line);
-        }
-        Some("debug") => {
-            log::debug!(target: "mihomo", "[mihomo] {}", line);
-        }
-        _ => {
-            log::debug!(target: "mihomo", "[mihomo] {}", line);
-        }
+        "error" => log::error!(target: "mihomo", "[mihomo] {}", line),
+        "warning" => log::warn!(target: "mihomo", "[mihomo] {}", line),
+        "info" => log::info!(target: "mihomo", "[mihomo] {}", line),
+        "debug" => log::debug!(target: "mihomo", "[mihomo] {}", line),
+        _ => log::debug!(target: "mihomo", "[mihomo] {}", line),
     }
 }
 
@@ -148,7 +139,9 @@ pub fn start_clash(body: StartBody) -> Result<()> {
     let log_file_path = PathBuf::from(log_file_path);
     let log_dir = log_file_path.parent().unwrap().to_path_buf();
     let log_file_name = log_file_path.file_name().unwrap().to_str().unwrap();
-    LogConfig::global().update_config(log_file_name, log_dir, None)?;
+    LogConfig::global()
+        .lock()
+        .update_config(log_file_name, log_dir, None)?;
 
     run_core(body)?;
 
@@ -189,12 +182,24 @@ pub fn get_clash() -> Result<ClashStatus> {
 pub fn update_log_level(body: LogLevelBody) -> Result<()> {
     let log_level = body.level;
     match log_level.as_str() {
-        "off" => LogConfig::global().update_log_level(log::LevelFilter::Off),
-        "error" => LogConfig::global().update_log_level(log::LevelFilter::Error),
-        "warn" => LogConfig::global().update_log_level(log::LevelFilter::Warn),
-        "info" => LogConfig::global().update_log_level(log::LevelFilter::Info),
-        "debug" => LogConfig::global().update_log_level(log::LevelFilter::Debug),
-        "trace" => LogConfig::global().update_log_level(log::LevelFilter::Trace),
+        "off" => LogConfig::global()
+            .lock()
+            .update_log_level(log::LevelFilter::Off),
+        "error" => LogConfig::global()
+            .lock()
+            .update_log_level(log::LevelFilter::Error),
+        "warn" => LogConfig::global()
+            .lock()
+            .update_log_level(log::LevelFilter::Warn),
+        "info" => LogConfig::global()
+            .lock()
+            .update_log_level(log::LevelFilter::Info),
+        "debug" => LogConfig::global()
+            .lock()
+            .update_log_level(log::LevelFilter::Debug),
+        "trace" => LogConfig::global()
+            .lock()
+            .update_log_level(log::LevelFilter::Trace),
         _ => bail!("invalid log level"),
     }
 }

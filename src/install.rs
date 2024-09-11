@@ -16,7 +16,7 @@ fn main() -> Result<(), Error> {
     use std::path::Path;
 
     let log_dir = parse_args();
-    LogConfig::global().init(log_dir)?;
+    LogConfig::global().lock().init(log_dir)?;
 
     log::debug!("Start install Clash Verge Service.");
 
@@ -143,7 +143,7 @@ fn main() -> Result<(), Error> {
     use std::{fs::File, io::Write};
 
     let log_dir = parse_args();
-    LogConfig::global().init(log_dir)?;
+    LogConfig::global().lock().init(log_dir)?;
 
     log::debug!("Start install Clash Verge Service.");
     let service_binary_path = std::env::current_exe()
@@ -252,7 +252,7 @@ fn main() -> Result<(), Error> {
     };
 
     let log_dir = parse_args();
-    LogConfig::global().init(log_dir)?;
+    LogConfig::global().lock().init(log_dir)?;
 
     log::debug!("Start installing Clash Verge Service.");
 

@@ -14,7 +14,7 @@ fn main() -> Result<(), Error> {
     use std::{fs::remove_file, path::Path};
 
     let log_dir = parse_args();
-    LogConfig::global().init(log_dir)?;
+    LogConfig::global().lock().init(log_dir)?;
 
     log::debug!("Start uninstall Clash Verge Service");
 
@@ -56,7 +56,7 @@ fn main() -> Result<(), Error> {
     use std::{fs::remove_file, path::Path};
 
     let log_dir = parse_args();
-    LogConfig::global().init(log_dir)?;
+    LogConfig::global().lock().init(log_dir)?;
 
     log::debug!("Start uninstall Clash Verge Service");
     const SERVICE_NAME: &str = "clash-verge-service";
@@ -105,7 +105,7 @@ fn main() -> Result<(), Error> {
     };
 
     let log_dir = parse_args();
-    LogConfig::global().init(log_dir)?;
+    LogConfig::global().lock().init(log_dir)?;
 
     log::debug!("Start uninstall Clash Verge Service.");
 
