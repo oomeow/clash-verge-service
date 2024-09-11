@@ -1,4 +1,4 @@
-name: Pre Release CI
+name: Pre-Release CI
 
 on:
   push:
