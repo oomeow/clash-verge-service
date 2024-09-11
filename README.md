@@ -1,3 +1,3 @@
 # Clash Verge Service
 
-A Windows Service.
+Supports multiple platforms Service.

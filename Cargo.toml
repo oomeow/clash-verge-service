@@ -1,8 +1,8 @@
 [package]
 name = "clash-verge-service"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
-authors = ["oomeow", "Clash Verge Rev Team"]
+authors = ["zzzgydi", "Clash Verge Rev Team", "oomeow"]
 license = "GPL-3.0"
 repository = "https://github.com/oomeow/clash-verge-service.git"
 
