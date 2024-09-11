@@ -65,12 +65,10 @@ fn run_core(body: StartBody) -> Result<()> {
     let shared_child = log_expect(SharedChild::spawn(&mut command), "failed to start clash");
     let child = Arc::new(shared_child);
     let child_ = child.clone();
-    let guard = Arc::new(RwLock::new(()));
 
     // spawn a thread to read the stdout of the child process
     spawn(move || {
         if let Some(mut output) = child.take_stdout() {
-            let _lock = guard.read().unwrap();
             let mut reader = BufReader::new(&mut output).lines();
             while let Some(line) = reader.next() {
                 if let Ok(line) = line {
