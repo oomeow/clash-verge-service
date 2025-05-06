@@ -1,10 +1,22 @@
 mod data;
 mod web;
 
-use self::data::*;
-use self::web::*;
+use anyhow::Result;
+use data::JsonResponse;
+use data::SocketCommand;
+use futures_util::StreamExt;
+use tipsy::Connection;
+use tipsy::Endpoint;
+use tipsy::OnConflict;
+use tipsy::ServerId;
+use tokio::io::AsyncBufReadExt;
+use tokio::io::AsyncWriteExt;
+use tokio::io::BufReader;
 use tokio::runtime::Runtime;
-use warp::Filter;
+use web::get_clash;
+use web::get_version;
+use web::start_clash;
+use web::stop_clash;
 
 #[cfg(windows)]
 use std::{ffi::OsString, time::Duration};
@@ -22,17 +34,16 @@ use windows_service::{
 #[cfg(windows)]
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 const SERVICE_NAME: &str = "clash_verge_service";
-const LISTEN_PORT: u16 = 33211;
 
 macro_rules! wrap_response {
     ($expr: expr) => {
         match $expr {
-            Ok(data) => warp::reply::json(&JsonResponse {
+            Ok(data) => serde_json::to_string(&JsonResponse {
                 code: 0,
                 msg: "ok".into(),
                 data: Some(data),
             }),
-            Err(err) => warp::reply::json(&JsonResponse {
+            Err(err) => serde_json::to_string(&JsonResponse {
                 code: 400,
                 msg: format!("{err}"),
                 data: Option::<()>::None,
@@ -66,43 +77,61 @@ pub async fn run_service() -> anyhow::Result<()> {
         process_id: None,
     })?;
 
-    let api_get_version = warp::get()
-        .and(warp::path("version"))
-        .map(move || wrap_response!(get_version()));
+    let path = ServerId::new("verge-server").parent_folder(std::env::temp_dir());
+    let mut incoming = Endpoint::new(path, OnConflict::Overwrite)?.incoming()?;
 
-    let api_start_clash = warp::post()
-        .and(warp::path("clash"))
-        .and(warp::body::json())
-        .map(move |body: StartBody| wrap_response!(start_clash(body)));
+    while let Some(result) = incoming.next().await {
+        match result {
+            Ok(stream) => {
+                let mut reader = BufReader::new(stream);
+                tokio::spawn(async move {
+                    loop {
+                        let mut buf = String::new();
+                        match reader.read_line(&mut buf).await {
+                            Ok(size) if size > 0 => match serde_json::from_str(&buf) {
+                                Ok(cmd) => {
+                                    if handle_socket_command(&mut reader, cmd).await.is_err() {
+                                        log::error!("Error handling socket command");
+                                    }
+                                }
+                                Err(err) => {
+                                    log::error!("Error parsing socket command: {}", err);
+                                }
+                            },
+                            Ok(_) => {
+                                log::debug!("empty line, the socket is closed");
+                                break;
+                            }
+                            Err(err) => {
+                                log::error!("read error: {}", err);
+                                break;
+                            }
+                        }
+                    }
+                    log::info!("Connection closed");
+                });
+            }
+            _ => unreachable!("ideally"),
+        }
+    }
 
-    let api_get_clash = warp::get()
-        .and(warp::path("clash"))
-        .map(move || wrap_response!(get_clash()));
+    Ok(())
+}
 
-    let api_stop_clash = warp::delete()
-        .and(warp::path("clash"))
-        .map(move || wrap_response!(stop_clash()));
-
-    let api_update_log_level = warp::put()
-        .and(warp::path("loglevel"))
-        .and(warp::body::json())
-        .map(|body: LogLevelBody| wrap_response!(update_log_level(body)));
-
-    let api_stop_service = warp::delete()
-        .and(warp::path("service"))
-        .map(|| wrap_response!(stop_service()));
-
-    warp::serve(
-        api_get_version
-            .or(api_start_clash)
-            .or(api_get_clash)
-            .or(api_stop_clash)
-            .or(api_update_log_level)
-            .or(api_stop_service),
-    )
-    .run(([127, 0, 0, 1], LISTEN_PORT))
-    .await;
-
+async fn handle_socket_command(
+    reader: &mut BufReader<Connection>,
+    cmd: SocketCommand,
+) -> Result<()> {
+    log::info!("Handling socket command: {:?}", cmd);
+    let response = match cmd {
+        SocketCommand::GetVersion => wrap_response!(get_version())?,
+        SocketCommand::GetClash => wrap_response!(get_clash())?,
+        SocketCommand::StartClash(body) => wrap_response!(start_clash(body))?,
+        SocketCommand::StopClash => wrap_response!(stop_clash())?,
+        SocketCommand::StopService => wrap_response!(stop_service())?,
+    };
+    let data = format!("{}\n", serde_json::to_string(&response)?);
+    reader.write_all(data.as_bytes()).await?;
     Ok(())
 }
 

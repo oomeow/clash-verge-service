@@ -48,14 +48,13 @@ impl LogConfig {
         } = LogConfig::default();
 
         let log_file_name = log_file_name.clone();
-        let limited_file_size = limited_file_size.clone().map(|v| v);
-        let log_level = log_level.clone().unwrap();
+        let log_level = log_level.unwrap();
 
         let config = Self::create_log_config(
             &log_file_name,
             log_dir.clone(),
             limited_file_size,
-            log_level.clone(),
+            log_level,
         );
 
         if let Some(config) = config {
@@ -79,7 +78,7 @@ impl LogConfig {
             log_dir: mut c_log_dir,
             limited_file_size: mut c_limited_file_size,
             log_handle: mut c_log_handle,
-            log_level: mut c_log_level
+            log_level: mut c_log_level,
         } = self.clone();
         if c_log_handle.is_none() {
             log::error!("update log config failed, log handle is none, please init first");
@@ -104,7 +103,7 @@ impl LogConfig {
 
         // let log_level = c_log_level.clone().unwrap();
         let config = Self::create_log_config(
-            &log_file_name,
+            log_file_name,
             Some(log_dir.clone()),
             limited_file_size,
             c_log_level.unwrap(),
@@ -126,7 +125,7 @@ impl LogConfig {
         log_level: LevelFilter,
     ) -> Option<Config> {
         let log_pattern = "{d(%Y-%m-%d %H:%M:%S)} {l} - {m}{n}";
-        let encoder = Box::new(PatternEncoder::new(&log_pattern));
+        let encoder = Box::new(PatternEncoder::new(log_pattern));
 
         let mut appenders = Vec::new();
         let log_to_file = log_dir.is_some();
@@ -175,7 +174,7 @@ impl LogConfig {
             .logger(app_logger)
             .logger(mihomo_logger)
             .build(root)
-            .map_or(None, |v| Some(v))
+            .ok()
     }
 
     #[allow(unused)]
@@ -186,8 +185,8 @@ impl LogConfig {
         }
         let config = Self::create_log_config(
             self.log_file_name.clone().as_str(),
-            self.log_dir.clone().map(|v| v),
-            self.limited_file_size.clone(),
+            self.log_dir.clone(),
+            self.limited_file_size,
             log_level,
         );
         if let Some(config) = config {

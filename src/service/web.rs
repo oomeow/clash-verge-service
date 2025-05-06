@@ -1,10 +1,7 @@
 use super::data::*;
 use crate::log_config::{log_expect, LogConfig};
 use anyhow::{bail, Result};
-use once_cell::sync::OnceCell;
-use parking_lot::Mutex;
 use regex::Regex;
-use serde::Serialize;
 use shared_child::SharedChild;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
@@ -13,31 +10,6 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::thread::spawn;
 use sysinfo::System;
-
-#[derive(Debug, Serialize, Clone)]
-pub struct ClashStatus {
-    pub auto_restart: bool,
-    pub restart_retry_count: u32,
-    pub info: Option<StartBody>,
-}
-
-impl Default for ClashStatus {
-    fn default() -> Self {
-        ClashStatus {
-            auto_restart: false,
-            restart_retry_count: 10,
-            info: None,
-        }
-    }
-}
-
-impl ClashStatus {
-    pub fn global() -> &'static Arc<Mutex<ClashStatus>> {
-        static CLASHSTATUS: OnceCell<Arc<Mutex<ClashStatus>>> = OnceCell::new();
-
-        CLASHSTATUS.get_or_init(|| Arc::new(Mutex::new(ClashStatus::default())))
-    }
-}
 
 /// GET /version
 /// 获取服务进程的版本
@@ -69,11 +41,9 @@ fn run_core(body: StartBody) -> Result<()> {
     // spawn a thread to read the stdout of the child process
     spawn(move || {
         if let Some(mut output) = child.take_stdout() {
-            let mut reader = BufReader::new(&mut output).lines();
-            while let Some(line) = reader.next() {
-                if let Ok(line) = line {
-                    wrap_mihomo_log(&line);
-                }
+            let reader = BufReader::new(&mut output).lines();
+            for line in reader.map_while(Result::ok) {
+                wrap_mihomo_log(&line);
             }
         }
         log::trace!("[clash-verge-service] exited old read core log thread");
@@ -179,27 +149,27 @@ pub fn stop_clash() -> Result<()> {
 /// 获取clash当前执行信息
 pub fn get_clash() -> Result<ClashStatus> {
     let arc = ClashStatus::global().lock();
-    if arc.restart_retry_count <= 0 {
+    if arc.restart_retry_count == 0 {
         bail!("clash not executed, retry count exceeded!")
     }
-    match (arc.info.clone(), arc.restart_retry_count <= 0) {
+    match (arc.info.clone(), arc.restart_retry_count == 0) {
         (Some(_), false) => Ok(arc.clone()),
         (Some(_), true) => bail!("clash terminated, retry count exceeded!"),
         (None, _) => bail!("clash not executed"),
     }
 }
 
-pub fn update_log_level(body: LogLevelBody) -> Result<()> {
-    let log_level = body.level;
-    let log_level = match log_level.as_str() {
-        "off" => log::LevelFilter::Off,
-        "error" => log::LevelFilter::Error,
-        "warn" => log::LevelFilter::Warn,
-        "info" => log::LevelFilter::Info,
-        "debug" => log::LevelFilter::Debug,
-        "trace" => log::LevelFilter::Trace,
-        _ => bail!("invalid log level"),
-    };
-    LogConfig::global().lock().update_log_level(log_level)?;
-    Ok(())
-}
+// pub fn update_log_level(body: LogLevelBody) -> Result<()> {
+//     let log_level = body.level;
+//     let log_level = match log_level.as_str() {
+//         "off" => log::LevelFilter::Off,
+//         "error" => log::LevelFilter::Error,
+//         "warn" => log::LevelFilter::Warn,
+//         "info" => log::LevelFilter::Info,
+//         "debug" => log::LevelFilter::Debug,
+//         "trace" => log::LevelFilter::Trace,
+//         _ => bail!("invalid log level"),
+//     };
+//     LogConfig::global().lock().update_log_level(log_level)?;
+//     Ok(())
+// }

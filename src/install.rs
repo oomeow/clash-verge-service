@@ -178,7 +178,7 @@ fn main() -> Result<(), Error> {
                     Ok(())
                 }
             }
-            ucode @ (1 | 2 | 3) => {
+            ucode @ (1..=3) => {
                 log::debug!("The service is installed but it not active, start run service. (status code: {})", ucode);
                 log_expect(
                     std::process::Command::new("systemctl")
