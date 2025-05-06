@@ -1,7 +1,6 @@
 mod data;
 mod web;
 
-use anyhow::Result;
 use data::JsonResponse;
 use data::SocketCommand;
 use futures_util::StreamExt;
@@ -121,7 +120,7 @@ pub async fn run_service() -> anyhow::Result<()> {
 async fn handle_socket_command(
     reader: &mut BufReader<Connection>,
     cmd: SocketCommand,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     log::info!("Handling socket command: {:?}", cmd);
     let response = match cmd {
         SocketCommand::GetVersion => wrap_response!(get_version())?,
