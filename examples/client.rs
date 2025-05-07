@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use tipsy::{Endpoint, IntoIpcPath, ServerId};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -20,6 +22,13 @@ pub struct StartBody {
     pub log_file: String,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct JsonResponse {
+    pub code: u64,
+    pub msg: String,
+    pub data: Option<HashMap<String, String>>,
+}
+
 #[tokio::main]
 #[allow(deprecated)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -29,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut count = 0;
     let mut reader = BufReader::new(client);
-    while count < 5 {
+    while count < 1 {
         println!("SEND: GetVersion");
         // let param = Params {
         //     router: Router::StartClash,
@@ -46,9 +55,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             config_file: config_file.to_string_lossy().to_string(),
             log_file: log_file.to_string_lossy().to_string(),
         });
-        let param = SocketCommand::GetClash;
-        // let param = Router::StopClash;
+        // let param = SocketCommand::GetClash;
+        let param = SocketCommand::StopClash;
         let param = SocketCommand::GetVersion;
+        // let param = SocketCommand::StopService;
         let mut request_params = serde_json::to_string(&param).unwrap();
         request_params.push('\n');
         reader
@@ -58,8 +68,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let mut buf = String::new();
         reader.read_line(&mut buf).await?;
-        let message = buf.trim();
-        println!("RECV: {}", message);
+        println!("RECV: {:?}", buf);
+        let json: JsonResponse = serde_json::from_str(&buf).unwrap();
+        println!("JSON: {:?}", json);
 
         count += 1;
         std::thread::sleep(std::time::Duration::from_millis(1000));

@@ -7,11 +7,13 @@ use futures_util::StreamExt;
 use tipsy::Connection;
 use tipsy::Endpoint;
 use tipsy::OnConflict;
+use tipsy::SecurityAttributes;
 use tipsy::ServerId;
 use tokio::io::AsyncBufReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio::runtime::Runtime;
+use tokio::sync::watch::channel;
 use web::get_clash;
 use web::get_version;
 use web::start_clash;
@@ -77,44 +79,72 @@ pub async fn run_service() -> anyhow::Result<()> {
     })?;
 
     let path = ServerId::new("verge-server").parent_folder(std::env::temp_dir());
-    let mut incoming = Endpoint::new(path, OnConflict::Overwrite)?.incoming()?;
+    let security_attributes = SecurityAttributes::empty().allow_everyone_connect()?;
+    let mut incoming = Endpoint::new(path, OnConflict::Overwrite)?
+        .security_attributes(security_attributes)
+        .incoming()?;
 
-    while let Some(result) = incoming.next().await {
-        match result {
-            Ok(stream) => {
-                let mut reader = BufReader::new(stream);
-                tokio::spawn(async move {
-                    loop {
-                        let mut buf = String::new();
-                        match reader.read_line(&mut buf).await {
-                            Ok(size) if size > 0 => match serde_json::from_str(&buf) {
-                                Ok(cmd) => {
-                                    if handle_socket_command(&mut reader, cmd).await.is_err() {
-                                        log::error!("Error handling socket command");
-                                    }
-                                }
-                                Err(err) => {
-                                    log::error!("Error parsing socket command: {}", err);
-                                }
-                            },
-                            Ok(_) => {
-                                log::debug!("empty line, the socket is closed");
-                                break;
-                            }
-                            Err(err) => {
-                                log::error!("read error: {}", err);
-                                break;
-                            }
-                        }
+    let (shutdown_tx, mut shutdown_rx) = channel(());
+    loop {
+        tokio::select! {
+            Some(result) = incoming.next() => {
+                match result {
+                    Ok(stream) => {
+                        let reader = BufReader::new(stream);
+                        spawn_read_task(reader, shutdown_tx.clone()).await;
                     }
-                    log::info!("Connection closed");
-                });
+                    _ => unreachable!("ideally")
+                }
             }
-            _ => unreachable!("ideally"),
+            _ = shutdown_rx.changed() => {
+                let _ = stop_service();
+                log::info!("Shutdown Service");
+                break;
+            }
         }
     }
 
     Ok(())
+}
+
+async fn spawn_read_task(
+    mut reader: BufReader<Connection>,
+    shutdown_tx: tokio::sync::watch::Sender<()>,
+) {
+    tokio::spawn(async move {
+        loop {
+            let mut buf = String::new();
+            match reader.read_line(&mut buf).await {
+                Ok(size) if size > 0 => match serde_json::from_str::<SocketCommand>(&buf) {
+                    Ok(cmd) => {
+                        if handle_socket_command(&mut reader, cmd.clone())
+                            .await
+                            .is_err()
+                        {
+                            log::error!("Error handling socket command");
+                        }
+                        if let SocketCommand::StopService = cmd {
+                            let _ = reader.shutdown().await;
+                            let _ = shutdown_tx.send(());
+                            break;
+                        }
+                    }
+                    Err(err) => {
+                        log::error!("Error parsing socket command: {}", err);
+                    }
+                },
+                Ok(_) => {
+                    log::debug!("empty line, the socket is closed");
+                    break;
+                }
+                Err(err) => {
+                    log::error!("read error: {}", err);
+                    break;
+                }
+            }
+        }
+        log::info!("Connection closed");
+    });
 }
 
 async fn handle_socket_command(
@@ -127,9 +157,9 @@ async fn handle_socket_command(
         SocketCommand::GetClash => wrap_response!(get_clash())?,
         SocketCommand::StartClash(body) => wrap_response!(start_clash(body))?,
         SocketCommand::StopClash => wrap_response!(stop_clash())?,
-        SocketCommand::StopService => wrap_response!(stop_service())?,
+        SocketCommand::StopService => wrap_response!(anyhow::Result::<()>::Ok(()))?,
     };
-    let data = format!("{}\n", serde_json::to_string(&response)?);
+    let data = format!("{}\n", response);
     reader.write_all(data.as_bytes()).await?;
     Ok(())
 }

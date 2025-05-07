@@ -5,7 +5,7 @@ After=network-online.target nftables.service iptables.service
 [Service]
 Type=simple
 ExecStart={}
-Restart=always
+Restart=on-failure
 RestartSec=5
 
 [Install]
