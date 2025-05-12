@@ -79,11 +79,7 @@ pub async fn run_service() -> anyhow::Result<()> {
     })?;
 
     let path = ServerId::new("verge-server").parent_folder(std::env::temp_dir());
-    let security_attributes = if cfg!(windows) {
-        SecurityAttributes::allow_everyone_create()?
-    } else {
-        SecurityAttributes::empty().allow_everyone_connect()?
-    };
+    let security_attributes = SecurityAttributes::allow_everyone_connect()?;
     let mut incoming = Endpoint::new(path, OnConflict::Overwrite)?
         .security_attributes(security_attributes)
         .incoming()?;

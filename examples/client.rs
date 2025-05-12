@@ -40,12 +40,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut reader = BufReader::new(client);
     while count < 1 {
         println!("SEND: GetVersion");
-        // let param = Params {
-        //     router: Router::StartClash,
-        //     data: Some("verge-mihomo".to_string()),
-        // };
         let home_dir = std::env::home_dir().unwrap();
-        let config_dir = home_dir.join(".local/share/io.github.clash-verge-self.clash-verge-self");
+        let config_dir = home_dir.join(".local/share/io.github.oomeow.clash-verge-self");
         let config_file = config_dir.join("clash-verge.yaml");
         let log_file = config_dir.join("logs/service/aaaaaaaa.log");
         let param = SocketCommand::StartClash(StartBody {
@@ -56,8 +52,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             log_file: log_file.to_string_lossy().to_string(),
         });
         // let param = SocketCommand::GetClash;
-        let param = SocketCommand::StopClash;
-        let param = SocketCommand::GetVersion;
+        // let param = SocketCommand::StopClash;
+        // let param = SocketCommand::GetVersion;
         // let param = SocketCommand::StopService;
         let mut request_params = serde_json::to_string(&param).unwrap();
         request_params.push('\n');
