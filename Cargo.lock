@@ -938,9 +938,9 @@ dependencies = [
 
 [[package]]
 name = "tipsy"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87436c1f3ae5b48b99a76ab180e61e8ab0cf1c6bdd613b7de2cd60d712d2721f"
+checksum = "fab5c1c5ac400d3bbaa6072ed297f0e6825be190de858892b214ee09bc976145"
 dependencies = [
  "dirs",
  "futures-util",
