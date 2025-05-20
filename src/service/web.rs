@@ -11,6 +11,11 @@ use std::sync::Arc;
 use std::thread::spawn;
 use sysinfo::System;
 
+#[cfg(unix)]
+pub const SOCKET_PATH: &str = "/tmp/verge-mihomo.sock";
+#[cfg(windows)]
+pub const SOCKET_PATH: &str = r#"\\.\pipe\verge-mihomo"#;
+
 /// GET /version
 /// 获取服务进程的版本
 pub fn get_version() -> Result<HashMap<String, String>> {
@@ -27,7 +32,13 @@ fn run_core(body: StartBody) -> Result<()> {
     let body_clone = body.clone();
     let config_dir = body.config_dir.as_str();
     let config_file = body.config_file.as_str();
-    let args = vec!["-d", config_dir, "-f", config_file];
+    let mut args = vec!["-d", config_dir, "-f", config_file];
+    if cfg!(unix) {
+        args.push("-ext-ctl-unix");
+    } else {
+        args.push("-ext-ctl-pipe");
+    }
+    args.push(SOCKET_PATH);
 
     let mut command = Command::new(body.bin_path);
     command
@@ -141,6 +152,14 @@ pub fn stop_clash() -> Result<()> {
     log::debug!("[clash-verge-service] kill verge-mihomo process");
     for proc in procs {
         proc.kill();
+    }
+    #[cfg(unix)]
+    {
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+        let path = std::path::Path::new(SOCKET_PATH);
+        if path.exists() {
+            std::fs::remove_file(path)?;
+        }
     }
     Ok(())
 }
