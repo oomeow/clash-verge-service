@@ -1,7 +1,10 @@
 use super::{data::*, SOCKET_PATH};
 use crate::log_config::{log_expect, LogConfig};
 use anyhow::{bail, Result};
+use once_cell::sync::OnceCell;
+use parking_lot::Mutex;
 use regex::Regex;
+use serde::Serialize;
 use shared_child::SharedChild;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
@@ -10,6 +13,30 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::thread::spawn;
 use sysinfo::System;
+
+#[derive(Debug, Serialize, Clone)]
+pub struct ClashStatus {
+    pub auto_restart: bool,
+    pub restart_retry_count: u32,
+    pub info: Option<StartBody>,
+}
+
+impl Default for ClashStatus {
+    fn default() -> Self {
+        ClashStatus {
+            auto_restart: false,
+            restart_retry_count: 10,
+            info: None,
+        }
+    }
+}
+
+impl ClashStatus {
+    pub fn global() -> &'static Arc<Mutex<ClashStatus>> {
+        static CLASHSTATUS: OnceCell<Arc<Mutex<ClashStatus>>> = OnceCell::new();
+        CLASHSTATUS.get_or_init(|| Arc::new(Mutex::new(ClashStatus::default())))
+    }
+}
 
 /// GET /version
 /// 获取服务进程的版本
@@ -28,12 +55,14 @@ fn run_core(body: StartBody) -> Result<()> {
     let config_dir = body.config_dir.as_str();
     let config_file = body.config_file.as_str();
     let mut args = vec!["-d", config_dir, "-f", config_file];
-    if cfg!(unix) {
-        args.push("-ext-ctl-unix");
-    } else {
-        args.push("-ext-ctl-pipe");
+    if body.use_local_socket {
+        if cfg!(unix) {
+            args.push("-ext-ctl-unix");
+        } else {
+            args.push("-ext-ctl-pipe");
+        }
+        args.push(SOCKET_PATH);
     }
-    args.push(SOCKET_PATH);
 
     let mut command = Command::new(body.bin_path);
     command
@@ -154,12 +183,15 @@ pub fn stop_clash() -> Result<()> {
 /// GET /get_clash
 /// 获取clash当前执行信息
 pub fn get_clash() -> Result<ClashStatus> {
-    let arc = ClashStatus::global().lock();
-    if arc.restart_retry_count == 0 {
+    let clash_status = ClashStatus::global().lock();
+    if clash_status.restart_retry_count == 0 {
         bail!("clash not executed, retry count exceeded!")
     }
-    match (arc.info.clone(), arc.restart_retry_count == 0) {
-        (Some(_), false) => Ok(arc.clone()),
+    match (
+        clash_status.info.clone(),
+        clash_status.restart_retry_count == 0,
+    ) {
+        (Some(_), false) => Ok(clash_status.clone()),
         (Some(_), true) => bail!("clash terminated, retry count exceeded!"),
         (None, _) => bail!("clash not executed"),
     }

@@ -18,6 +18,7 @@ use web::get_clash;
 use web::get_version;
 use web::start_clash;
 use web::stop_clash;
+use web::ClashStatus;
 
 #[cfg(windows)]
 use std::{ffi::OsString, time::Duration};
@@ -163,12 +164,17 @@ async fn handle_socket_command(
         SocketCommand::StartClash(body) => wrap_response!(start_clash(body))?,
         SocketCommand::StopClash => {
             let res = wrap_response!(stop_clash())?;
-            #[cfg(unix)]
-            {
-                std::thread::sleep(std::time::Duration::from_millis(1000));
-                let path = std::path::Path::new(SOCKET_PATH);
-                if path.exists() {
-                    std::fs::remove_file(path)?;
+            let clash_status = ClashStatus::global().lock();
+            if let Some(clash_info) = clash_status.info.as_ref() {
+                if clash_info.use_local_socket {
+                    #[cfg(unix)]
+                    {
+                        std::thread::sleep(std::time::Duration::from_millis(1000));
+                        let path = std::path::Path::new(SOCKET_PATH);
+                        if path.exists() {
+                            std::fs::remove_file(path)?;
+                        }
+                    }
                 }
             }
             res

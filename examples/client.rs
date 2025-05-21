@@ -20,6 +20,7 @@ pub struct StartBody {
     pub config_dir: String,
     pub config_file: String,
     pub log_file: String,
+    pub use_local_socket: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -49,6 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             config_dir: config_dir.to_string_lossy().to_string(),
             config_file: config_file.to_string_lossy().to_string(),
             log_file: log_file.to_string_lossy().to_string(),
+            use_local_socket: false,
         });
         // let param = SocketCommand::GetClash;
         let param = SocketCommand::StopClash;
