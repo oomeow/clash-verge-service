@@ -36,6 +36,11 @@ use windows_service::{
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 const SERVICE_NAME: &str = "clash_verge_service";
 
+#[cfg(unix)]
+pub const SOCKET_PATH: &str = "/tmp/verge-mihomo.sock";
+#[cfg(windows)]
+pub const SOCKET_PATH: &str = r#"\\.\pipe\verge-mihomo"#;
+
 macro_rules! wrap_response {
     ($expr: expr) => {
         match $expr {
@@ -156,7 +161,18 @@ async fn handle_socket_command(
         SocketCommand::GetVersion => wrap_response!(get_version())?,
         SocketCommand::GetClash => wrap_response!(get_clash())?,
         SocketCommand::StartClash(body) => wrap_response!(start_clash(body))?,
-        SocketCommand::StopClash => wrap_response!(stop_clash())?,
+        SocketCommand::StopClash => {
+            let res = wrap_response!(stop_clash())?;
+            #[cfg(unix)]
+            {
+                std::thread::sleep(std::time::Duration::from_millis(1000));
+                let path = std::path::Path::new(SOCKET_PATH);
+                if path.exists() {
+                    std::fs::remove_file(path)?;
+                }
+            }
+            res
+        }
         SocketCommand::StopService => wrap_response!(anyhow::Result::<()>::Ok(()))?,
     };
     let data = format!("{}\n", response);

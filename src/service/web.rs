@@ -1,4 +1,4 @@
-use super::data::*;
+use super::{data::*, SOCKET_PATH};
 use crate::log_config::{log_expect, LogConfig};
 use anyhow::{bail, Result};
 use regex::Regex;
@@ -10,11 +10,6 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::thread::spawn;
 use sysinfo::System;
-
-#[cfg(unix)]
-pub const SOCKET_PATH: &str = "/tmp/verge-mihomo.sock";
-#[cfg(windows)]
-pub const SOCKET_PATH: &str = r#"\\.\pipe\verge-mihomo"#;
 
 /// GET /version
 /// 获取服务进程的版本
@@ -152,14 +147,6 @@ pub fn stop_clash() -> Result<()> {
     log::debug!("[clash-verge-service] kill verge-mihomo process");
     for proc in procs {
         proc.kill();
-    }
-    #[cfg(unix)]
-    {
-        std::thread::sleep(std::time::Duration::from_millis(1000));
-        let path = std::path::Path::new(SOCKET_PATH);
-        if path.exists() {
-            std::fs::remove_file(path)?;
-        }
     }
     Ok(())
 }
