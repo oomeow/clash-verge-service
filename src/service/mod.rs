@@ -163,12 +163,18 @@ async fn handle_socket_command(
         SocketCommand::GetClash => wrap_response!(get_clash())?,
         SocketCommand::StartClash(body) => wrap_response!(start_clash(body))?,
         SocketCommand::StopClash => {
+            #[cfg(unix)]
+            let clash_info = {
+                let clash_status = ClashStatus::global().lock();
+                log::info!("clash status {:?}", clash_status);
+                clash_status.info.clone()
+            };
             let res = wrap_response!(stop_clash())?;
-            let clash_status = ClashStatus::global().lock();
-            if let Some(clash_info) = clash_status.info.as_ref() {
-                if clash_info.use_local_socket {
-                    #[cfg(unix)]
-                    {
+            #[cfg(unix)]
+            {
+                if let Some(clash_info) = clash_info {
+                    if clash_info.use_local_socket {
+                        log::info!("delete socket path");
                         std::thread::sleep(std::time::Duration::from_millis(1000));
                         let path = std::path::Path::new(SOCKET_PATH);
                         if path.exists() {
