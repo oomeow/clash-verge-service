@@ -1,9 +1,16 @@
 mod data;
-mod web;
+mod handle;
+mod logger;
 
 use data::JsonResponse;
 use data::SocketCommand;
 use futures_util::StreamExt;
+use handle::get_clash;
+use handle::get_logs;
+use handle::get_version;
+use handle::start_clash;
+use handle::stop_clash;
+use handle::ClashStatus;
 use tipsy::Connection;
 use tipsy::Endpoint;
 use tipsy::OnConflict;
@@ -14,11 +21,6 @@ use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio::runtime::Runtime;
 use tokio::sync::watch::channel;
-use web::get_clash;
-use web::get_version;
-use web::start_clash;
-use web::stop_clash;
-use web::ClashStatus;
 
 #[cfg(windows)]
 use std::{ffi::OsString, time::Duration};
@@ -161,6 +163,7 @@ async fn handle_socket_command(
     let response = match cmd {
         SocketCommand::GetVersion => wrap_response!(get_version())?,
         SocketCommand::GetClash => wrap_response!(get_clash())?,
+        SocketCommand::GetLogs => wrap_response!(get_logs())?,
         SocketCommand::StartClash(body) => wrap_response!(start_clash(body))?,
         SocketCommand::StopClash => {
             #[cfg(unix)]
@@ -192,7 +195,7 @@ async fn handle_socket_command(
     Ok(())
 }
 
-// 停止服务
+/// 停止服务
 #[cfg(windows)]
 fn stop_service() -> Result<()> {
     let status_handle =
@@ -210,6 +213,7 @@ fn stop_service() -> Result<()> {
 
     Ok(())
 }
+
 #[cfg(not(windows))]
 fn stop_service() -> anyhow::Result<()> {
     // systemctl stop clash_verge_service

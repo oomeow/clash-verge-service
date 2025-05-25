@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub enum SocketCommand {
     GetVersion,
     GetClash,
+    GetLogs,
     StartClash(StartBody),
     StopClash,
     StopService,

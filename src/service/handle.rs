@@ -1,12 +1,13 @@
 use super::{data::*, SOCKET_PATH};
 use crate::log_config::{log_expect, LogConfig};
+use crate::service::logger::Logger;
 use anyhow::{bail, Result};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use regex::Regex;
 use serde::Serialize;
 use shared_child::SharedChild;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -78,6 +79,7 @@ fn run_core(body: StartBody) -> Result<()> {
         if let Some(mut output) = child.take_stdout() {
             let reader = BufReader::new(&mut output).lines();
             for line in reader.map_while(Result::ok) {
+                Logger::global().set_log(line.clone());
                 wrap_mihomo_log(&line);
             }
         }
@@ -99,6 +101,7 @@ fn run_core(body: StartBody) -> Result<()> {
                     let mut cs = ClashStatus::global().lock();
                     cs.restart_retry_count = status.restart_retry_count - 1;
                 }
+                Logger::global().clear_log();
                 if let Err(e) = run_core(body_clone) {
                     log::error!(
                         "[clash-verge-service] failed to restart clash: {}, retry count: {}",
@@ -133,7 +136,6 @@ fn wrap_mihomo_log(line: &str) {
     }
 }
 
-/// POST /start_clash
 /// 启动clash进程
 pub fn start_clash(body: StartBody) -> Result<()> {
     // stop the old clash bin
@@ -160,7 +162,6 @@ pub fn start_clash(body: StartBody) -> Result<()> {
     Ok(())
 }
 
-/// POST /stop_clash
 /// 停止clash进程
 pub fn stop_clash() -> Result<()> {
     log::debug!("[clash-verge-service] stop clash");
@@ -169,6 +170,7 @@ pub fn stop_clash() -> Result<()> {
         let mut arc = ClashStatus::global().lock();
         *arc = ClashStatus::default();
     }
+    Logger::global().clear_log();
 
     let mut system = System::new();
     system.refresh_all();
@@ -180,7 +182,6 @@ pub fn stop_clash() -> Result<()> {
     Ok(())
 }
 
-/// GET /get_clash
 /// 获取clash当前执行信息
 pub fn get_clash() -> Result<ClashStatus> {
     let clash_status = ClashStatus::global().lock();
@@ -195,6 +196,11 @@ pub fn get_clash() -> Result<ClashStatus> {
         (Some(_), true) => bail!("clash terminated, retry count exceeded!"),
         (None, _) => bail!("clash not executed"),
     }
+}
+
+/// 获取 logs
+pub fn get_logs() -> Result<VecDeque<String>> {
+    Ok(Logger::global().get_log())
 }
 
 // pub fn update_log_level(body: LogLevelBody) -> Result<()> {
