@@ -111,7 +111,6 @@ fn run_core(body: StartBody) -> Result<()> {
                 }
             } else {
                 log::error!("[clash-verge-service] failed to restart clash, retry count exceeded!");
-                panic!("failed to restart clash, retry count exceeded!");
             }
         }
         log::trace!("[clash-verge-service] exited old restart core thread");

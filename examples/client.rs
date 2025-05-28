@@ -72,25 +72,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await
             .expect("Unable to write message to client");
 
-        let mut buf = String::new();
-        reader.read_line(&mut buf).await?;
-        println!("RECV: {:?}", buf);
+        let mut response = String::new();
+        reader.read_line(&mut response).await?;
 
         match param {
             SocketCommand::StartClash(_)
             | SocketCommand::StopClash
             | SocketCommand::StopService => break,
             SocketCommand::GetClash => {
-                let json: JsonResponse<ClashStatus> = serde_json::from_str(&buf).unwrap();
+                let json: JsonResponse<ClashStatus> = serde_json::from_str(&response).unwrap();
                 println!("JSON: {:?}", json);
             }
             SocketCommand::GetLogs => {
-                let json: JsonResponse<Vec<String>> = serde_json::from_str(&buf).unwrap();
-                println!("JSON: {:?}", json);
+                let json: JsonResponse<Vec<String>> = serde_json::from_str(&response).unwrap();
+                if let Some(logs) = json.data {
+                    for log in logs {
+                        println!("{}", log);
+                    }
+                }
+                println!("---------------------------------------\n")
             }
             SocketCommand::GetVersion => {
                 let json: JsonResponse<HashMap<String, String>> =
-                    serde_json::from_str(&buf).unwrap();
+                    serde_json::from_str(&response).unwrap();
                 println!("JSON: {:?}", json);
             }
         }

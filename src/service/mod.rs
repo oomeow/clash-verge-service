@@ -178,7 +178,6 @@ async fn handle_socket_command(
                 if let Some(clash_info) = clash_info {
                     if clash_info.use_local_socket {
                         log::info!("delete socket path");
-                        std::thread::sleep(std::time::Duration::from_millis(1000));
                         let path = std::path::Path::new(SOCKET_PATH);
                         if path.exists() {
                             std::fs::remove_file(path)?;
