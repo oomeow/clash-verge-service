@@ -17,7 +17,6 @@ pub struct StartBody {
     pub config_dir: String,
     pub config_file: String,
     pub log_file: String,
-    pub use_local_socket: bool,
 }
 
 // #[derive(Debug, Deserialize, Serialize, Clone)]

@@ -28,7 +28,6 @@ pub struct StartBody {
     pub config_dir: String,
     pub config_file: String,
     pub log_file: String,
-    pub use_local_socket: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -41,7 +40,7 @@ pub struct JsonResponse<T> {
 #[tokio::main]
 #[allow(deprecated)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let path = ServerId::new("verge-server").parent_folder(std::env::temp_dir());
+    let path = ServerId::new("verge-service-server").parent_folder(std::env::temp_dir());
     println!("Server path: {:?}", path.clone().into_ipc_path()?);
     let client = Endpoint::connect(path).await?;
 
@@ -58,7 +57,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             config_dir: config_dir.to_string_lossy().to_string(),
             config_file: config_file.to_string_lossy().to_string(),
             log_file: log_file.to_string_lossy().to_string(),
-            use_local_socket: false,
         });
         let param = SocketCommand::GetClash;
         let param = SocketCommand::StopClash;

@@ -1,4 +1,4 @@
-use super::{data::*, SOCKET_PATH};
+use super::{data::*, MIHOMO_SOCKET_PATH};
 use crate::log_config::{log_expect, LogConfig};
 use crate::service::logger::Logger;
 use anyhow::{bail, Result};
@@ -55,15 +55,18 @@ fn run_core(body: StartBody) -> Result<()> {
     let body_clone = body.clone();
     let config_dir = body.config_dir.as_str();
     let config_file = body.config_file.as_str();
-    let mut args = vec!["-d", config_dir, "-f", config_file];
-    if body.use_local_socket {
+    let args = vec![
+        "-d",
+        config_dir,
+        "-f",
+        config_file,
         if cfg!(unix) {
-            args.push("-ext-ctl-unix");
+            "-ext-ctl-unix"
         } else {
-            args.push("-ext-ctl-pipe");
-        }
-        args.push(SOCKET_PATH);
-    }
+            "-ext-ctl-pipe"
+        },
+        MIHOMO_SOCKET_PATH,
+    ];
 
     let mut command = Command::new(body.bin_path);
     command

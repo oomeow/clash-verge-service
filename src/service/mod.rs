@@ -10,7 +10,6 @@ use handle::get_logs;
 use handle::get_version;
 use handle::start_clash;
 use handle::stop_clash;
-use handle::ClashStatus;
 use tipsy::Connection;
 use tipsy::Endpoint;
 use tipsy::OnConflict;
@@ -40,9 +39,11 @@ const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 const SERVICE_NAME: &str = "clash_verge_service";
 
 #[cfg(unix)]
-pub const SOCKET_PATH: &str = "/tmp/verge-mihomo.sock";
+pub const MIHOMO_SOCKET_PATH: &str = "/tmp/verge-mihomo.sock";
 #[cfg(windows)]
-pub const SOCKET_PATH: &str = r#"\\.\pipe\verge-mihomo"#;
+pub const MIHOMO_SOCKET_PATH: &str = r#"\\.\pipe\verge-mihomo"#;
+
+pub const SERVER_ID: &str = "verge-service-server";
 
 macro_rules! wrap_response {
     ($expr: expr) => {
@@ -86,7 +87,7 @@ pub async fn run_service() -> anyhow::Result<()> {
         process_id: None,
     })?;
 
-    let path = ServerId::new("verge-server").parent_folder(std::env::temp_dir());
+    let path = ServerId::new(SERVER_ID).parent_folder(std::env::temp_dir());
     let security_attributes = SecurityAttributes::allow_everyone_connect()?;
     let mut incoming = Endpoint::new(path, OnConflict::Overwrite)?
         .security_attributes(security_attributes)
@@ -166,23 +167,13 @@ async fn handle_socket_command(
         SocketCommand::GetLogs => wrap_response!(get_logs())?,
         SocketCommand::StartClash(body) => wrap_response!(start_clash(body))?,
         SocketCommand::StopClash => {
-            #[cfg(unix)]
-            let clash_info = {
-                let clash_status = ClashStatus::global().lock();
-                log::info!("clash status {:?}", clash_status);
-                clash_status.info.clone()
-            };
             let res = wrap_response!(stop_clash())?;
             #[cfg(unix)]
             {
-                if let Some(clash_info) = clash_info {
-                    if clash_info.use_local_socket {
-                        log::info!("delete socket path");
-                        let path = std::path::Path::new(SOCKET_PATH);
-                        if path.exists() {
-                            std::fs::remove_file(path)?;
-                        }
-                    }
+                log::info!("delete socket path");
+                let path = std::path::Path::new(MIHOMO_SOCKET_PATH);
+                if path.exists() {
+                    std::fs::remove_file(path)?;
                 }
             }
             res
