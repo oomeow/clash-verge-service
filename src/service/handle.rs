@@ -5,7 +5,7 @@ use anyhow::{bail, Result};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use regex::Regex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use shared_child::SharedChild;
 use std::collections::{HashMap, VecDeque};
 use std::io::{BufRead, BufReader};
@@ -15,7 +15,7 @@ use std::sync::Arc;
 use std::thread::spawn;
 use sysinfo::System;
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ClashStatus {
     pub auto_restart: bool,
     pub restart_retry_count: u32,

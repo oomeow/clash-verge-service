@@ -1,6 +1,8 @@
-mod data;
+pub mod data;
 mod handle;
 mod logger;
+#[cfg(test)]
+pub use handle::ClashStatus;
 
 use data::JsonResponse;
 use data::SocketCommand;
@@ -10,6 +12,8 @@ use handle::get_logs;
 use handle::get_version;
 use handle::start_clash;
 use handle::stop_clash;
+use rsa::RsaPrivateKey;
+use rsa::RsaPublicKey;
 use tipsy::Connection;
 use tipsy::Endpoint;
 use tipsy::OnConflict;
@@ -33,6 +37,11 @@ use windows_service::{
     service_control_handler::{self, ServiceControlHandlerResult},
     service_dispatcher, Result,
 };
+
+use crate::crypto::decrypt_socket_data;
+use crate::crypto::encrypt_socket_data;
+use crate::crypto::generate_rsa_keys;
+use crate::crypto::load_keys;
 
 #[cfg(windows)]
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
@@ -87,6 +96,16 @@ pub async fn run_service() -> anyhow::Result<()> {
         process_id: None,
     })?;
 
+    let instant = std::time::Instant::now();
+    let (private_key, public_key) = match load_keys() {
+        Ok(keys) => keys,
+        Err(_) => {
+            println!("failed to load keys form file, starting regenerate keys and save keys");
+            generate_rsa_keys()?
+        }
+    };
+    println!("load rsa keys tooks {:?}", instant.elapsed());
+
     let path = ServerId::new(SERVER_ID).parent_folder(std::env::temp_dir());
     let security_attributes = SecurityAttributes::allow_everyone_connect()?;
     let mut incoming = Endpoint::new(path, OnConflict::Overwrite)?
@@ -100,7 +119,7 @@ pub async fn run_service() -> anyhow::Result<()> {
                 match result {
                     Ok(stream) => {
                         let reader = BufReader::new(stream);
-                        spawn_read_task(reader, shutdown_tx.clone()).await;
+                        spawn_read_task(private_key.clone(),public_key.clone(), reader, shutdown_tx.clone()).await;
                     }
                     _ => unreachable!("ideally")
                 }
@@ -117,31 +136,36 @@ pub async fn run_service() -> anyhow::Result<()> {
 }
 
 async fn spawn_read_task(
+    private_key: RsaPrivateKey,
+    public_key: RsaPublicKey,
     mut reader: BufReader<Connection>,
     shutdown_tx: tokio::sync::watch::Sender<()>,
 ) {
     tokio::spawn(async move {
         loop {
-            let mut buf = String::new();
-            match reader.read_line(&mut buf).await {
-                Ok(size) if size > 0 => match serde_json::from_str::<SocketCommand>(&buf) {
-                    Ok(cmd) => {
-                        if handle_socket_command(&mut reader, cmd.clone())
-                            .await
-                            .is_err()
-                        {
-                            log::error!("Error handling socket command");
+            let mut msg = String::new();
+            match reader.read_line(&mut msg).await {
+                Ok(size) if size > 0 => {
+                    let req_data = decrypt_socket_data(&private_key.clone(), &msg).unwrap();
+                    match serde_json::from_str::<SocketCommand>(&req_data) {
+                        Ok(cmd) => {
+                            if handle_socket_command(&public_key.clone(), &mut reader, cmd.clone())
+                                .await
+                                .is_err()
+                            {
+                                log::error!("Error handling socket command");
+                            }
+                            if let SocketCommand::StopService = cmd {
+                                let _ = reader.shutdown().await;
+                                let _ = shutdown_tx.send(());
+                                break;
+                            }
                         }
-                        if let SocketCommand::StopService = cmd {
-                            let _ = reader.shutdown().await;
-                            let _ = shutdown_tx.send(());
-                            break;
+                        Err(err) => {
+                            log::error!("Error parsing socket command: {}", err);
                         }
                     }
-                    Err(err) => {
-                        log::error!("Error parsing socket command: {}", err);
-                    }
-                },
+                }
                 Ok(_) => {
                     log::debug!("empty line, the socket is closed");
                     break;
@@ -157,6 +181,7 @@ async fn spawn_read_task(
 }
 
 async fn handle_socket_command(
+    public_key: &RsaPublicKey,
     reader: &mut BufReader<Connection>,
     cmd: SocketCommand,
 ) -> anyhow::Result<()> {
@@ -180,8 +205,8 @@ async fn handle_socket_command(
         }
         SocketCommand::StopService => wrap_response!(anyhow::Result::<()>::Ok(()))?,
     };
-    let data = format!("{}\n", response);
-    reader.write_all(data.as_bytes()).await?;
+    let combined = encrypt_socket_data(public_key, &response)?;
+    reader.write_all(combined.as_bytes()).await?;
     Ok(())
 }
 

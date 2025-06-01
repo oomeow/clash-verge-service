@@ -26,7 +26,7 @@ pub struct StartBody {
 //     // pub mihomo_level: String,
 // }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct JsonResponse<T: Serialize> {
     pub code: u64,
     pub msg: String,
