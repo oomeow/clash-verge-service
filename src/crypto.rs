@@ -12,9 +12,7 @@ use rsa::{pkcs1::DecodeRsaPublicKey, RsaPrivateKey, RsaPublicKey};
 use sha2::digest::generic_array::GenericArray;
 
 pub const PRI_KEY_PEM_FILE: &str = ".private.pem";
-// "/home/oomeow/workplace/rust-projects/clash-verge-service/private.pem";
 pub const PUB_KEY_PEM_FILE: &str = ".public.pem";
-// "/home/oomeow/workplace/rust-projects/clash-verge-service/public.pem";
 
 // pub fn init_rsa_keys() -> Result<()> {
 //     let private_key_path = Path::new(&PRI_KEY_PEM_PATH);
@@ -72,10 +70,6 @@ pub fn load_keys() -> Result<(RsaPrivateKey, RsaPublicKey)> {
 
     Ok((private_key, public_key))
 }
-
-// pub fn load_public_key(pem: &str) -> Result<RsaPublicKey> {
-//     Ok(RsaPublicKey::from_pkcs1_pem(pem)?)
-// }
 
 pub fn rsa_encrypt(public_key: &RsaPublicKey, data: &[u8]) -> Result<Vec<u8>> {
     Ok(public_key.encrypt(&mut rand::thread_rng(), Pkcs1v15Encrypt, data)?)

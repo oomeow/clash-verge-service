@@ -99,8 +99,8 @@ fn run_core(body: StartBody) -> Result<()> {
                     "[clash-verge-service] mihomo terminated, restart count: {}, try to restart...",
                     status.restart_retry_count
                 );
-                // update the restart retry count
                 {
+                    // update the restart retry count
                     let mut cs = ClashStatus::global().lock();
                     cs.restart_retry_count = status.restart_retry_count - 1;
                 }
@@ -167,8 +167,8 @@ pub fn start_clash(body: StartBody) -> Result<()> {
 /// 停止clash进程
 pub fn stop_clash() -> Result<()> {
     log::debug!("[clash-verge-service] stop clash");
-    // reset the clash status
     {
+        // reset the clash status
         let mut arc = ClashStatus::global().lock();
         *arc = ClashStatus::default();
     }
