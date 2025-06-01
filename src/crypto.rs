@@ -9,7 +9,6 @@ use base64::Engine;
 use rsa::pkcs1::{DecodeRsaPrivateKey, EncodeRsaPrivateKey, EncodeRsaPublicKey};
 use rsa::Pkcs1v15Encrypt;
 use rsa::{pkcs1::DecodeRsaPublicKey, RsaPrivateKey, RsaPublicKey};
-use sha2::digest::generic_array::GenericArray;
 
 pub const PRI_KEY_PEM_FILE: &str = ".private.pem";
 pub const PUB_KEY_PEM_FILE: &str = ".public.pem";
@@ -80,14 +79,14 @@ pub fn rsa_decrypt(private_key: &RsaPrivateKey, enc_data: &[u8]) -> Result<Vec<u
 }
 
 pub fn aes_encrypt(key: &[u8], nonce: &[u8], data: &[u8]) -> Result<Vec<u8>> {
-    let cipher = Aes256Gcm::new(GenericArray::from_slice(key));
+    let cipher = Aes256Gcm::new(key.into());
     Ok(cipher
         .encrypt(Nonce::from_slice(nonce), data)
         .map_err(|e| anyhow::anyhow!("aes encrypt failed, error {:?}", e))?)
 }
 
 pub fn aes_decrypt(key: &[u8], nonce: &[u8], data: &[u8]) -> Result<Vec<u8>> {
-    let cipher = Aes256Gcm::new(GenericArray::from_slice(key));
+    let cipher = Aes256Gcm::new(key.into());
     Ok(cipher
         .decrypt(Nonce::from_slice(nonce), data)
         .map_err(|e| anyhow::anyhow!("aes decrypt failed, error {:?}", e))?)
