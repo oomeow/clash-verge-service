@@ -28,12 +28,18 @@ mod test {
         crypto::{decrypt_socket_data, encrypt_socket_data, load_keys},
         service::{
             data::{JsonResponse, SocketCommand, StartBody},
-            ClashStatus,
+            run_service, ClashStatus, SERVER_ID,
         },
     };
 
+    #[tokio::test]
+    async fn test_start_server() -> Result<()> {
+        run_service().await?;
+        Ok(())
+    }
+
     async fn connect_client() -> Result<Connection> {
-        let path = ServerId::new("verge-service-server").parent_folder(std::env::temp_dir());
+        let path = ServerId::new(SERVER_ID).parent_folder(std::env::temp_dir());
         println!("Server path: {:?}", path.clone().into_ipc_path()?);
         let client = Endpoint::connect(path).await?;
         Ok(client)
