@@ -40,7 +40,7 @@ jobs:
 
       - name: Install Rust
         if: matrix.os != 'ubuntu-latest'
-        uses: dtolnay/rust-toolchain@1.77.0
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Add Rust Target
         if: matrix.os != 'ubuntu-latest'
