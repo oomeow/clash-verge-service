@@ -1,5 +1,7 @@
 use std::env::current_exe;
 use std::io::Read;
+use std::path::PathBuf;
+use std::str::FromStr;
 
 use aes_gcm::aead::{Aead, KeyInit, OsRng};
 use aes_gcm::{AeadCore, Aes256Gcm, Nonce};
@@ -27,42 +29,41 @@ pub fn generate_rsa_keys() -> Result<(RsaPrivateKey, RsaPublicKey)> {
     let public_key = RsaPublicKey::from(&private_key);
     let current_exe_path = current_exe()?;
     let current_exe_dir = current_exe_path.parent();
-    match current_exe_dir {
-        Some(current_exe_dir) => {
-            std::fs::write(
-                current_exe_dir.join(PRI_KEY_PEM_FILE),
-                &private_key.to_pkcs1_pem(Default::default())?,
-            )?;
-            std::fs::write(
-                current_exe_dir.join(PUB_KEY_PEM_FILE),
-                &public_key.to_pkcs1_pem(Default::default())?,
-            )?;
-        }
-        None => {
-            std::fs::write(
-                PRI_KEY_PEM_FILE,
-                &private_key.to_pkcs1_pem(Default::default())?,
-            )?;
-            std::fs::write(
-                PUB_KEY_PEM_FILE,
-                &public_key.to_pkcs1_pem(Default::default())?,
-            )?;
-        }
-    }
-
+    let (pri_key_path, pub_key_path) = match current_exe_dir {
+        Some(current_exe_dir) => (
+            current_exe_dir.join(PRI_KEY_PEM_FILE),
+            current_exe_dir.join(PUB_KEY_PEM_FILE),
+        ),
+        None => (
+            PathBuf::from_str(PRI_KEY_PEM_FILE)?,
+            PathBuf::from_str(PUB_KEY_PEM_FILE)?,
+        ),
+    };
+    std::fs::write(pri_key_path, &private_key.to_pkcs1_pem(Default::default())?)?;
+    std::fs::write(pub_key_path, &public_key.to_pkcs1_pem(Default::default())?)?;
     Ok((private_key, public_key))
 }
 
 pub fn load_keys() -> Result<(RsaPrivateKey, RsaPublicKey)> {
     let current_exe_path = current_exe()?;
-    let current_exe_dir = current_exe_path.parent().unwrap();
+    let current_exe_dir = current_exe_path.parent();
+    let (pri_key_path, pub_key_path) = match current_exe_dir {
+        Some(current_exe_dir) => (
+            current_exe_dir.join(PRI_KEY_PEM_FILE),
+            current_exe_dir.join(PUB_KEY_PEM_FILE),
+        ),
+        None => (
+            PathBuf::from_str(PRI_KEY_PEM_FILE)?,
+            PathBuf::from_str(PUB_KEY_PEM_FILE)?,
+        ),
+    };
 
-    let mut pri_key_file = std::fs::File::open(current_exe_dir.join(PRI_KEY_PEM_FILE))?;
+    let mut pri_key_file = std::fs::File::open(pri_key_path)?;
     let mut private_key_content = String::new();
     pri_key_file.read_to_string(&mut private_key_content)?;
     let private_key = RsaPrivateKey::from_pkcs1_pem(&private_key_content)?;
 
-    let mut pub_key_file = std::fs::File::open(current_exe_dir.join(PUB_KEY_PEM_FILE))?;
+    let mut pub_key_file = std::fs::File::open(pub_key_path)?;
     let mut public_key_content = String::new();
     pub_key_file.read_to_string(&mut public_key_content)?;
     let public_key = RsaPublicKey::from_pkcs1_pem(&public_key_content)?;
