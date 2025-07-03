@@ -222,7 +222,7 @@ where
     E: std::fmt::Display,
 {
     result.unwrap_or_else(|err| {
-        log::error!("{}: {}", msg, err);
+        log::error!("{msg}: {err}");
         panic!("{}", msg);
     })
 }

@@ -130,11 +130,11 @@ fn wrap_mihomo_log(line: &str) {
         .map(|m| m.as_str())
         .unwrap_or("info");
     match level {
-        "error" => log::error!(target: "mihomo", "[mihomo] {}", line),
-        "warning" => log::warn!(target: "mihomo", "[mihomo] {}", line),
-        "info" => log::info!(target: "mihomo", "[mihomo] {}", line),
-        "debug" => log::debug!(target: "mihomo", "[mihomo] {}", line),
-        _ => log::debug!(target: "mihomo", "[mihomo] {}", line),
+        "error" => log::error!(target: "mihomo", "[mihomo] {line}"),
+        "warning" => log::warn!(target: "mihomo", "[mihomo] {line}"),
+        "info" => log::info!(target: "mihomo", "[mihomo] {line}"),
+        "debug" => log::debug!(target: "mihomo", "[mihomo] {line}"),
+        _ => log::debug!(target: "mihomo", "[mihomo] {line}"),
     }
 }
 

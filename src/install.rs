@@ -159,7 +159,7 @@ fn main() -> Result<(), Error> {
     let status_code = log_expect(
         std::process::Command::new("systemctl")
             .arg("status")
-            .arg(format!("{}.service", SERVICE_NAME))
+            .arg(format!("{SERVICE_NAME}.service"))
             .arg("--no-pager")
             .output(),
         "Failed to execute 'systemctl status' command",
@@ -179,11 +179,11 @@ fn main() -> Result<(), Error> {
                 }
             }
             ucode @ (1..=3) => {
-                log::debug!("The service is installed but it not active, start run service. (status code: {})", ucode);
+                log::debug!("The service is installed but it not active, start run service. (status code: {ucode})");
                 log_expect(
                     std::process::Command::new("systemctl")
                         .arg("start")
-                        .arg(format!("{}.service", SERVICE_NAME))
+                        .arg(format!("{SERVICE_NAME}.service"))
                         .output(),
                     "Failed to execute 'systemctl start' command",
                 );
@@ -203,8 +203,8 @@ fn main() -> Result<(), Error> {
         }
     }
 
-    let unit_file = format!("/etc/systemd/system/{}.service", SERVICE_NAME);
-    log::debug!("Generating service file [{}].", unit_file);
+    let unit_file = format!("/etc/systemd/system/{SERVICE_NAME}.service");
+    log::debug!("Generating service file [{unit_file}].");
     let unit_file = Path::new(&unit_file);
 
     let unit_file_content = format!(

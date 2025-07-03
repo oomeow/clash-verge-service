@@ -162,7 +162,7 @@ async fn spawn_read_task(
                             }
                         }
                         Err(err) => {
-                            log::error!("Error parsing socket command: {}", err);
+                            log::error!("Error parsing socket command: {err}");
                         }
                     }
                 }
@@ -171,7 +171,7 @@ async fn spawn_read_task(
                     break;
                 }
                 Err(err) => {
-                    log::error!("read error: {}", err);
+                    log::error!("read error: {err}");
                     break;
                 }
             }
@@ -185,7 +185,7 @@ async fn handle_socket_command(
     reader: &mut BufReader<Connection>,
     cmd: SocketCommand,
 ) -> anyhow::Result<()> {
-    log::info!("Handling socket command: {:?}", cmd);
+    log::info!("Handling socket command: {cmd:?}");
     let response = match cmd {
         SocketCommand::GetVersion => wrap_response!(get_version())?,
         SocketCommand::GetClash => wrap_response!(get_clash())?,

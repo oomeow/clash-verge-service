@@ -62,7 +62,7 @@ fn main() -> Result<(), Error> {
     const SERVICE_NAME: &str = "clash-verge-service";
 
     // Disable the service
-    log::debug!("Disabling [{}] service", SERVICE_NAME);
+    log::debug!("Disabling [{SERVICE_NAME}] service");
     log_expect(
         std::process::Command::new("systemctl")
             .arg("disable")
@@ -73,8 +73,8 @@ fn main() -> Result<(), Error> {
     );
 
     // Remove the unit file.
-    let unit_file = format!("/etc/systemd/system/{}.service", SERVICE_NAME);
-    log::debug!("Removing unit service file [{}].", unit_file);
+    let unit_file = format!("/etc/systemd/system/{SERVICE_NAME}.service");
+    log::debug!("Removing unit service file [{unit_file}].");
     let unit_file = Path::new(&unit_file);
     if unit_file.exists() {
         log::debug!("Service file exists, removing it");

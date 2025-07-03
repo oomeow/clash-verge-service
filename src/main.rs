@@ -65,7 +65,7 @@ mod test {
         let mut reader = BufReader::new(client);
         let response = send(&mut reader, SocketCommand::GetVersion).await?;
         let json: JsonResponse<HashMap<String, String>> = serde_json::from_str(&response)?;
-        println!("{:?}", json);
+        println!("{json:?}");
         Ok(())
     }
 
@@ -95,7 +95,7 @@ mod test {
         let mut reader = BufReader::new(client);
         let response = send(&mut reader, SocketCommand::GetClash).await?;
         let json: JsonResponse<ClashStatus> = serde_json::from_str(&response)?;
-        println!("{:?}", json);
+        println!("{json:?}");
         Ok(())
     }
 
@@ -109,7 +109,7 @@ mod test {
             let json: JsonResponse<Vec<String>> = serde_json::from_str(&response)?;
             if let Some(logs) = json.data {
                 for log in logs {
-                    println!("{}", log);
+                    println!("{log}");
                 }
             }
             println!("---------------------------------------\n");
@@ -125,7 +125,7 @@ mod test {
         let mut reader = BufReader::new(client);
         let response = send(&mut reader, SocketCommand::StopClash).await?;
         let json: JsonResponse<()> = serde_json::from_str(&response)?;
-        println!("{:?}", json);
+        println!("{json:?}");
         Ok(())
     }
 
@@ -135,7 +135,7 @@ mod test {
         let mut reader = BufReader::new(client);
         let response = send(&mut reader, SocketCommand::StopService).await?;
         let json: JsonResponse<()> = serde_json::from_str(&response)?;
-        println!("{:?}", json);
+        println!("{json:?}");
         Ok(())
     }
 }
