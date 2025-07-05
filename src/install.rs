@@ -303,7 +303,7 @@ fn main() -> Result<(), Error> {
         account_password: None,
     };
 
-    log::debug!("Creating service: {:?}", service_info);
+    log::debug!("Creating service: {service_info:?}");
     let start_access = ServiceAccess::CHANGE_CONFIG | ServiceAccess::START;
     let service = service_manager.create_service(&service_info, start_access)?;
 

@@ -122,7 +122,7 @@ fn main() -> Result<(), Error> {
     if service_status.current_state != ServiceState::Stopped {
         log::debug!("Service status is not stopped, stopping it first.");
         if let Err(err) = service.stop() {
-            log::error!("Failed to stop service: {}", err);
+            log::error!("Failed to stop service: {err}");
         }
         // Wait for service to stop
         thread::sleep(Duration::from_secs(1));
