@@ -10,7 +10,7 @@ fn main() {
 
 #[cfg(target_os = "macos")]
 fn main() -> Result<(), Error> {
-    use log_config::{log_expect, parse_args, LogConfig};
+    use log_config::{LogConfig, log_expect, parse_args};
     use std::fs::File;
     use std::io::Write;
     use std::path::Path;
@@ -138,7 +138,7 @@ fn main() -> Result<(), Error> {
 fn main() -> Result<(), Error> {
     const SERVICE_NAME: &str = "clash-verge-service";
     use core::panic;
-    use log_config::{log_expect, parse_args, LogConfig};
+    use log_config::{LogConfig, log_expect, parse_args};
     use std::path::Path;
     use std::{fs::File, io::Write};
 
@@ -174,12 +174,14 @@ fn main() -> Result<(), Error> {
         Some(code) => match code {
             0 => {
                 return {
-                    log::debug!("The service is already installed and actived. (status code: 0)");
+                    log::debug!("The service is already installed and activated. (status code: 0)");
                     Ok(())
-                }
+                };
             }
             ucode @ (1..=3) => {
-                log::debug!("The service is installed but it not active, start run service. (status code: {ucode})");
+                log::debug!(
+                    "The service is installed but it not active, start run service. (status code: {ucode})"
+                );
                 log_expect(
                     std::process::Command::new("systemctl")
                         .arg("start")
@@ -241,7 +243,7 @@ fn main() -> Result<(), Error> {
 /// install and start the service
 #[cfg(windows)]
 fn main() -> Result<(), Error> {
-    use log_config::{parse_args, LogConfig};
+    use log_config::{LogConfig, parse_args};
     use std::ffi::{OsStr, OsString};
     use windows_service::{
         service::{

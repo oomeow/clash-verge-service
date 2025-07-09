@@ -29,13 +29,13 @@ use tokio::sync::watch::channel;
 use std::{ffi::OsString, time::Duration};
 #[cfg(windows)]
 use windows_service::{
-    define_windows_service,
+    Result, define_windows_service,
     service::{
         ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
         ServiceType,
     },
     service_control_handler::{self, ServiceControlHandlerResult},
-    service_dispatcher, Result,
+    service_dispatcher,
 };
 
 use crate::crypto::decrypt_socket_data;
@@ -100,11 +100,11 @@ pub async fn run_service() -> anyhow::Result<()> {
     let (private_key, public_key) = match load_keys() {
         Ok(keys) => keys,
         Err(_) => {
-            println!("failed to load keys form file, starting regenerate keys and save keys");
+            log::error!("failed to load keys form file, starting regenerate keys and save keys");
             generate_rsa_keys()?
         }
     };
-    println!("load rsa keys tooks {:?}", instant.elapsed());
+    log::debug!("load rsa keys took {:?}", instant.elapsed());
 
     let path = ServerId::new(SERVER_ID).parent_folder(std::env::temp_dir());
     let security_attributes = SecurityAttributes::allow_everyone_connect()?;
