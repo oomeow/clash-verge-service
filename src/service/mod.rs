@@ -4,6 +4,10 @@ mod logger;
 #[cfg(test)]
 pub use handle::ClashStatus;
 
+use crate::crypto::decrypt_socket_data;
+use crate::crypto::encrypt_socket_data;
+use crate::crypto::generate_rsa_keys;
+use crate::crypto::load_keys;
 use data::JsonResponse;
 use data::SocketCommand;
 use futures_util::StreamExt;
@@ -14,6 +18,8 @@ use handle::start_clash;
 use handle::stop_clash;
 use rsa::RsaPrivateKey;
 use rsa::RsaPublicKey;
+#[cfg(windows)]
+use std::{ffi::OsString, time::Duration};
 use tipsy::Connection;
 use tipsy::Endpoint;
 use tipsy::OnConflict;
@@ -24,9 +30,6 @@ use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio::runtime::Runtime;
 use tokio::sync::watch::channel;
-
-#[cfg(windows)]
-use std::{ffi::OsString, time::Duration};
 #[cfg(windows)]
 use windows_service::{
     Result, define_windows_service,
@@ -37,11 +40,6 @@ use windows_service::{
     service_control_handler::{self, ServiceControlHandlerResult},
     service_dispatcher,
 };
-
-use crate::crypto::decrypt_socket_data;
-use crate::crypto::encrypt_socket_data;
-use crate::crypto::generate_rsa_keys;
-use crate::crypto::load_keys;
 
 #[cfg(windows)]
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;

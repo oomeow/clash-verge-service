@@ -1,7 +1,7 @@
-use super::{data::*, MIHOMO_SOCKET_PATH};
-use crate::log_config::{log_expect, LogConfig};
+use super::{MIHOMO_SOCKET_PATH, data::*};
+use crate::log_config::{LogConfig, log_expect};
 use crate::service::logger::Logger;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use regex::Regex;

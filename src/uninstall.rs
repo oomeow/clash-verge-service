@@ -10,7 +10,7 @@ fn main() {
 
 #[cfg(target_os = "macos")]
 fn main() -> Result<(), Error> {
-    use log_config::{log_expect, parse_args, LogConfig};
+    use log_config::{LogConfig, log_expect, parse_args};
     use std::{fs::remove_file, path::Path};
 
     let log_dir = parse_args();
@@ -52,7 +52,7 @@ fn main() -> Result<(), Error> {
 
 #[cfg(target_os = "linux")]
 fn main() -> Result<(), Error> {
-    use log_config::{log_expect, parse_args, LogConfig};
+    use log_config::{LogConfig, log_expect, parse_args};
     use std::{fs::remove_file, path::Path};
 
     let log_dir = parse_args();
@@ -97,7 +97,7 @@ fn main() -> Result<(), Error> {
 /// stop and uninstall the service
 #[cfg(windows)]
 fn main() -> Result<(), Error> {
-    use log_config::{parse_args, LogConfig};
+    use log_config::{LogConfig, parse_args};
     use std::{thread, time::Duration};
     use windows_service::{
         service::{ServiceAccess, ServiceState},

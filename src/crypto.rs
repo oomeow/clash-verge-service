@@ -1,16 +1,15 @@
+use aes_gcm::aead::{Aead, KeyInit, OsRng};
+use aes_gcm::{AeadCore, Aes256Gcm, Nonce};
+use anyhow::{Ok, Result, anyhow, bail};
+use base64::Engine;
+use base64::prelude::BASE64_STANDARD;
+use rsa::Pkcs1v15Encrypt;
+use rsa::pkcs1::{DecodeRsaPrivateKey, EncodeRsaPrivateKey, EncodeRsaPublicKey};
+use rsa::{RsaPrivateKey, RsaPublicKey, pkcs1::DecodeRsaPublicKey};
 use std::env::current_exe;
 use std::io::Read;
 use std::path::PathBuf;
 use std::str::FromStr;
-
-use aes_gcm::aead::{Aead, KeyInit, OsRng};
-use aes_gcm::{AeadCore, Aes256Gcm, Nonce};
-use anyhow::{anyhow, bail, Ok, Result};
-use base64::prelude::BASE64_STANDARD;
-use base64::Engine;
-use rsa::pkcs1::{DecodeRsaPrivateKey, EncodeRsaPrivateKey, EncodeRsaPublicKey};
-use rsa::Pkcs1v15Encrypt;
-use rsa::{pkcs1::DecodeRsaPublicKey, RsaPrivateKey, RsaPublicKey};
 
 pub const PRI_KEY_PEM_FILE: &str = ".private.pem";
 pub const PUB_KEY_PEM_FILE: &str = ".public.pem";

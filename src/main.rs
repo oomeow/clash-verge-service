@@ -27,8 +27,9 @@ mod test {
     use crate::{
         crypto::{decrypt_socket_data, encrypt_socket_data, load_keys},
         service::{
+            ClashStatus, SERVER_ID,
             data::{JsonResponse, SocketCommand, StartBody},
-            run_service, ClashStatus, SERVER_ID,
+            run_service,
         },
     };
 

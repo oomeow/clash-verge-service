@@ -1,15 +1,14 @@
-use std::{env, fs, path::PathBuf, sync::Arc};
-
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use log::LevelFilter;
 use log4rs::{
+    Config, Handle,
     append::{console::ConsoleAppender, file::FileAppender},
     config::{Appender, Logger, Root},
     encode::pattern::PatternEncoder,
-    Config, Handle,
 };
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
+use std::{env, fs, path::PathBuf, sync::Arc};
 
 #[derive(Debug, Clone)]
 pub struct LogConfig {
