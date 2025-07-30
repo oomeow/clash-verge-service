@@ -18,7 +18,7 @@ fn main() {
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashMap, time::Duration};
+    use std::collections::HashMap;
 
     use anyhow::{Ok, Result};
     use tipsy::{Connection, Endpoint, IntoIpcPath, ServerId};
@@ -26,6 +26,7 @@ mod test {
 
     use crate::{
         crypto::{decrypt_socket_data, encrypt_socket_data, load_keys},
+        log_config::LogConfig,
         service::{
             ClashStatus, SERVER_ID,
             data::{JsonResponse, SocketCommand, StartBody},
@@ -35,6 +36,7 @@ mod test {
 
     #[tokio::test]
     async fn test_start_server() -> Result<()> {
+        let _ = LogConfig::global().lock().init(None);
         run_service().await?;
         Ok(())
     }
@@ -80,13 +82,19 @@ mod test {
         let log_file = config_dir.join("logs/service/aaaaaaaa.log");
         let param = SocketCommand::StartClash(StartBody {
             core_type: Some("verge-mihomo-alpha".to_string()),
+            #[cfg(unix)]
+            socket_path: Some("/tmp/verge-mihomo-test.sock".to_string()),
+            #[cfg(windows)]
+            socket_path: Some(r"\\.\pipe\verge-mihomo-test".to_string()),
             bin_path: "/usr/bin/verge-mihomo-alpha".to_string(),
             config_dir: config_dir.to_string_lossy().to_string(),
             config_file: config_file.to_string_lossy().to_string(),
             log_file: log_file.to_string_lossy().to_string(),
         });
 
-        let _response = send(&mut reader, param).await?;
+        let response = send(&mut reader, param).await?;
+        let json: JsonResponse<()> = serde_json::from_str(&response)?;
+        println!("{json:?}");
         Ok(())
     }
 
@@ -104,18 +112,13 @@ mod test {
     async fn test_get_logs() -> Result<()> {
         let client = connect_client().await?;
         let mut reader = BufReader::new(client);
-        let mut count = 0;
-        while count < 100 {
-            let response = send(&mut reader, SocketCommand::GetLogs).await?;
-            let json: JsonResponse<Vec<String>> = serde_json::from_str(&response)?;
-            if let Some(logs) = json.data {
-                for log in logs {
-                    println!("{log}");
-                }
+        let response = send(&mut reader, SocketCommand::GetLogs).await?;
+        println!("{}", response);
+        let json: JsonResponse<Vec<String>> = serde_json::from_str(&response)?;
+        if let Some(logs) = json.data {
+            for log in logs {
+                println!("{log}");
             }
-            println!("---------------------------------------\n");
-            count += 1;
-            tokio::time::sleep(Duration::from_millis(1000)).await;
         }
         Ok(())
     }

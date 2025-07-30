@@ -13,6 +13,7 @@ pub enum SocketCommand {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct StartBody {
     pub core_type: Option<String>,
+    pub socket_path: Option<String>,
     pub bin_path: String,
     pub config_dir: String,
     pub config_file: String,

@@ -44,12 +44,6 @@ use windows_service::{
 #[cfg(windows)]
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 const SERVICE_NAME: &str = "clash_verge_service";
-
-#[cfg(unix)]
-pub const MIHOMO_SOCKET_PATH: &str = "/tmp/verge-mihomo.sock";
-#[cfg(windows)]
-pub const MIHOMO_SOCKET_PATH: &str = r#"\\.\pipe\verge-mihomo"#;
-
 pub const SERVER_ID: &str = "verge-service-server";
 
 macro_rules! wrap_response {
@@ -190,13 +184,22 @@ async fn handle_socket_command(
         SocketCommand::GetLogs => wrap_response!(get_logs())?,
         SocketCommand::StartClash(body) => wrap_response!(start_clash(body))?,
         SocketCommand::StopClash => {
+            #[cfg(unix)]
+            let socket_path = {
+                use crate::service::handle::ClashStatus;
+
+                let clash_status = ClashStatus::global().lock().clone();
+                clash_status.info.and_then(|i| i.socket_path)
+            };
             let res = wrap_response!(stop_clash())?;
             #[cfg(unix)]
             {
-                log::info!("delete socket path");
-                let path = std::path::Path::new(MIHOMO_SOCKET_PATH);
-                if path.exists() {
-                    std::fs::remove_file(path)?;
+                if let Some(socket_path) = socket_path {
+                    log::info!("delete socket path");
+                    let path = std::path::Path::new(&socket_path);
+                    if path.exists() {
+                        std::fs::remove_file(path)?;
+                    }
                 }
             }
             res

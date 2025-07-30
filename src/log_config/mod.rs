@@ -152,8 +152,11 @@ impl LogConfig {
         appenders.push(stdout_appender);
 
         let appenders_str = if log_to_file {
-            // vec!["file", "stdout"]
-            vec!["file"]
+            if cfg!(debug_assertions) {
+                vec!["file", "stdout"]
+            } else {
+                vec!["file"]
+            }
         } else {
             vec!["stdout"]
         };

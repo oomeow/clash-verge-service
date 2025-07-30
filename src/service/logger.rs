@@ -1,11 +1,11 @@
 use once_cell::sync::OnceCell;
-use parking_lot::Mutex;
+use parking_lot::RwLock;
 use std::{collections::VecDeque, sync::Arc};
 
 const LOGS_QUEUE_LEN: usize = 100;
 
 pub struct Logger {
-    log_data: Arc<Mutex<VecDeque<String>>>,
+    log_data: Arc<RwLock<VecDeque<String>>>,
 }
 
 impl Logger {
@@ -13,16 +13,16 @@ impl Logger {
         static LOGGER: OnceCell<Logger> = OnceCell::new();
 
         LOGGER.get_or_init(|| Logger {
-            log_data: Arc::new(Mutex::new(VecDeque::with_capacity(LOGS_QUEUE_LEN + 10))),
+            log_data: Arc::new(RwLock::new(VecDeque::with_capacity(LOGS_QUEUE_LEN + 10))),
         })
     }
 
     pub fn get_log(&self) -> VecDeque<String> {
-        self.log_data.lock().clone()
+        self.log_data.read().clone()
     }
 
     pub fn set_log(&self, text: String) {
-        let mut logs = self.log_data.lock();
+        let mut logs = self.log_data.write();
         if logs.len() > LOGS_QUEUE_LEN {
             logs.pop_front();
         }
@@ -30,7 +30,7 @@ impl Logger {
     }
 
     pub fn clear_log(&self) {
-        let mut logs = self.log_data.lock();
+        let mut logs = self.log_data.write();
         logs.clear();
     }
 }

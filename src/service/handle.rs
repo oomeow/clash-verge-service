@@ -1,4 +1,4 @@
-use super::{MIHOMO_SOCKET_PATH, data::*};
+use super::data::*;
 use crate::log_config::{LogConfig, log_expect};
 use crate::service::logger::Logger;
 use anyhow::{Result, bail};
@@ -55,18 +55,14 @@ fn run_core(body: StartBody) -> Result<()> {
     let body_clone = body.clone();
     let config_dir = body.config_dir.as_str();
     let config_file = body.config_file.as_str();
-    let args = vec![
-        "-d",
-        config_dir,
-        "-f",
-        config_file,
-        if cfg!(unix) {
-            "-ext-ctl-unix"
-        } else {
-            "-ext-ctl-pipe"
-        },
-        MIHOMO_SOCKET_PATH,
-    ];
+    let mut args = vec!["-d", config_dir, "-f", config_file];
+    if let Some(socket_path) = body.socket_path.as_ref() {
+        #[cfg(unix)]
+        args.push("-ext-ctl-unix");
+        #[cfg(windows)]
+        args.push("-ext-ctl-pipe");
+        args.push(socket_path);
+    }
 
     let mut command = Command::new(body.bin_path);
     command
@@ -141,7 +137,7 @@ fn wrap_mihomo_log(line: &str) {
 /// 启动clash进程
 pub fn start_clash(body: StartBody) -> Result<()> {
     // stop the old clash bin
-    log::debug!("[clash-verge-service] start clash");
+    log::debug!("[clash-verge-service] start clash {body:?}");
     stop_clash()?;
     {
         let mut arc = ClashStatus::global().lock();
