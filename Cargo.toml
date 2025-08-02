@@ -32,8 +32,8 @@ tokio = { version = "1", default-features = false, features = [
     "sync",
 ] }
 serde = { version = "1.0", features = ["derive"] }
-sysinfo = "0.35"
-shared_child = "1"
+sysinfo = "0.36"
+shared_child = "1.1.1"
 regex = "1.10"
 tipsy = "0.6"
 futures-util = "0.3"
