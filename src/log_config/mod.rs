@@ -132,9 +132,11 @@ impl LogConfig {
         if log_to_file {
             // create log to file appender
             let log_file = log_dir.unwrap().join(log_file_name);
-            if log_file.exists() && limited_size.is_some() {
+            if let Some(limited_size) = limited_size
+                && log_file.exists()
+            {
                 let metadata = fs::metadata(log_file.clone()).unwrap();
-                if metadata.len() >= limited_size.unwrap() {
+                if metadata.len() >= limited_size {
                     let _ = fs::rename(log_file.clone(), log_file.with_extension("old.log"));
                 }
             }
