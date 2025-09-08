@@ -2,6 +2,7 @@ use super::data::*;
 use crate::log_config::{LogConfig, log_expect};
 use crate::service::logger::Logger;
 use anyhow::{Result, bail};
+use chrono::{DateTime, Local};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use regex::Regex;
@@ -15,10 +16,19 @@ use std::sync::Arc;
 use std::thread::spawn;
 use sysinfo::System;
 
+/// 默认重新运行的尝试次数
+const DEFAULT_RETRY_COUNT: u8 = 10;
+
+/// 重置 restart_retry_count 的间隔时间，通过当前重试的时间与上一次运行时间的时间间隔做比对
+const INTERVAL_TIME: f64 = 60.0;
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ClashStatus {
     pub auto_restart: bool,
-    pub restart_retry_count: u32,
+    pub restart_retry_count: u8,
+    #[serde(skip)]
+    pub child: Arc<Mutex<Option<Arc<SharedChild>>>>,
+    pub last_running_time: DateTime<Local>,
     pub info: Option<StartBody>,
 }
 
@@ -26,7 +36,9 @@ impl Default for ClashStatus {
     fn default() -> Self {
         ClashStatus {
             auto_restart: false,
-            restart_retry_count: 10,
+            restart_retry_count: DEFAULT_RETRY_COUNT,
+            child: Arc::new(Mutex::new(None)),
+            last_running_time: Local::now(),
             info: None,
         }
     }
@@ -71,6 +83,11 @@ fn run_core(body: StartBody) -> Result<()> {
         .stderr(Stdio::piped());
     let shared_child = log_expect(SharedChild::spawn(&mut command), "failed to start clash");
     let child = Arc::new(shared_child);
+    {
+        let mut clash_status = ClashStatus::global().lock();
+        clash_status.child = Arc::new(Mutex::new(Some(child.clone())));
+        clash_status.last_running_time = Local::now();
+    }
     let child_ = child.clone();
 
     // spawn a thread to read the stdout of the child process
@@ -82,37 +99,51 @@ fn run_core(body: StartBody) -> Result<()> {
                 wrap_mihomo_log(&line);
             }
         }
-        log::trace!("[clash-verge-service] exited old read core log thread");
+        log::trace!("exited old read core log thread");
     });
 
     // spawn a thread to wait for the child process to exit
     spawn(move || {
         let _ = child_.wait();
-        let status = ClashStatus::global().lock().clone();
-        if status.auto_restart {
-            if status.restart_retry_count > 0 {
+        let mut clash_status = ClashStatus::global().lock().clone();
+        if clash_status.auto_restart {
+            let now = Local::now();
+            let elapsed = (now - clash_status.last_running_time).as_seconds_f64();
+            log::info!("elapsed time from last running time: {} seconds", elapsed);
+            if elapsed > INTERVAL_TIME {
+                log::info!(
+                    "elapsed time greater than {} seconds, reset retry count to {}",
+                    INTERVAL_TIME,
+                    DEFAULT_RETRY_COUNT
+                );
+                // update the restart retry count
+                let mut clash_status_ = ClashStatus::global().lock();
+                clash_status_.restart_retry_count = DEFAULT_RETRY_COUNT;
+                clash_status = clash_status_.clone();
+            }
+            if clash_status.restart_retry_count > 0 {
                 log::warn!(
-                    "[clash-verge-service] mihomo terminated, restart count: {}, try to restart...",
-                    status.restart_retry_count
+                    "mihomo terminated, restart count: {}, try to restart...",
+                    clash_status.restart_retry_count
                 );
                 {
                     // update the restart retry count
-                    let mut cs = ClashStatus::global().lock();
-                    cs.restart_retry_count = status.restart_retry_count - 1;
+                    let mut clash_status = ClashStatus::global().lock();
+                    clash_status.restart_retry_count -= 1;
                 }
                 Logger::global().clear_log();
                 if let Err(e) = run_core(body_clone) {
                     log::error!(
-                        "[clash-verge-service] failed to restart clash: {}, retry count: {}",
+                        "failed to restart clash: {}, retry count: {}",
                         e,
-                        status.restart_retry_count
+                        clash_status.restart_retry_count
                     );
                 }
             } else {
-                log::error!("[clash-verge-service] failed to restart clash, retry count exceeded!");
+                log::error!("failed to restart clash, retry count exceeded!");
             }
         }
-        log::trace!("[clash-verge-service] exited old restart core thread");
+        log::trace!("exited old restart core thread");
     });
     Ok(())
 }
@@ -137,24 +168,24 @@ fn wrap_mihomo_log(line: &str) {
 /// 启动clash进程
 pub fn start_clash(body: StartBody) -> Result<()> {
     // stop the old clash bin
-    log::debug!("[clash-verge-service] start clash {body:?}");
+    log::debug!("start clash {body:?}");
     stop_clash()?;
     {
-        let mut arc = ClashStatus::global().lock();
-        arc.auto_restart = true;
-        arc.info = Some(body.clone());
+        let mut clash_status = ClashStatus::global().lock();
+        clash_status.auto_restart = true;
+        clash_status.info = Some(body.clone());
     }
     // get log file path and init log config
     let log_file_path = body.log_file.clone();
     let log_file_path = PathBuf::from(log_file_path);
     let log_dir = log_file_path.parent().unwrap().to_path_buf();
     let log_file_name = log_file_path.file_name().unwrap().to_str().unwrap();
-    log::debug!("[clash-verge-service] update log config");
+    log::debug!("update log config");
     LogConfig::global()
         .lock()
         .update_config(log_file_name, log_dir, None)?;
 
-    log::debug!("[clash-verge-service] run clash core");
+    log::debug!("run clash core");
     run_core(body)?;
 
     Ok(())
@@ -162,10 +193,14 @@ pub fn start_clash(body: StartBody) -> Result<()> {
 
 /// 停止clash进程
 pub fn stop_clash() -> Result<()> {
-    log::debug!("[clash-verge-service] stop clash");
+    log::debug!("stop clash");
     {
         // reset the clash status
         let mut arc = ClashStatus::global().lock();
+        if let Some(child) = arc.child.lock().take() {
+            log::info!("stop clash by use shared child");
+            child.kill()?;
+        }
         *arc = ClashStatus::default();
     }
     Logger::global().clear_log();
@@ -173,8 +208,9 @@ pub fn stop_clash() -> Result<()> {
     let mut system = System::new();
     system.refresh_all();
     let procs = system.processes_by_name("verge-mihomo".as_ref());
-    log::debug!("[clash-verge-service] kill verge-mihomo process");
+    log::debug!("force kill verge-mihomo process");
     for proc in procs {
+        log::debug!("kill {}", proc.name().display());
         proc.kill();
     }
     Ok(())

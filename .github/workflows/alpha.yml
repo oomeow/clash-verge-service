@@ -2,8 +2,8 @@ name: Pre-Release CI
 
 on:
   push:
-    branches: [ main ]
-    tags-ignore: "*"
+    branches: [main]
+    tags-ignore: ["*"]
 
 concurrency:
   group: alpha-${{ github.ref }}
@@ -121,7 +121,7 @@ jobs:
           node-version: lts/*
 
       - name: Generate Changelog
-        run: | 
+        run: |
           pre_version=$(git tag --sort=-creatordate | grep -Ev "alpha" | sed -n 1p)
           npx changelogithub --from ${pre_version} --to main --output CHANGELOG.txt
         env:

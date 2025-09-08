@@ -96,7 +96,7 @@ impl LogConfig {
             need_update = true;
         }
         if !need_update {
-            log::debug!("[clash-verge-service] log config is not changed, no need to update");
+            log::debug!("log config is not changed, no need to update");
             return Ok(());
         }
 
