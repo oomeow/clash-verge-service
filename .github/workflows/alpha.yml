@@ -88,12 +88,12 @@ jobs:
       - name: Rename Clash Verge Service (Linux / MacOS)
         if: matrix.os != 'windows-latest'
         run: |
-          mv target/${{ matrix.target }}/release/clash-verge-service ./clash-verge-service-${{ matrix.target }}
+          cp target/${{ matrix.target }}/release/clash-verge-service ./clash-verge-service-${{ matrix.target }}
 
       - name: Rename Clash Verge Service (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          mv target/${{ matrix.target }}/release/clash-verge-service.exe ./clash-verge-service-${{ matrix.target }}.exe
+          cp target/${{ matrix.target }}/release/clash-verge-service.exe ./clash-verge-service-${{ matrix.target }}.exe
 
       - name: Update Tag
         uses: richardsimko/update-tag@v1
