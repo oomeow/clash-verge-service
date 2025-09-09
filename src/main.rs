@@ -5,11 +5,13 @@ mod service;
 mod uninstall;
 mod utils;
 
-use std::path::PathBuf;
+use std::{env::current_exe, path::PathBuf};
 
 use log_config::LogConfig;
 
 use clap::{Parser, Subcommand};
+#[cfg(windows)]
+use once_cell::sync::OnceCell;
 #[cfg(windows)]
 use windows_service::{define_windows_service, service_dispatcher};
 
@@ -41,22 +43,17 @@ enum Commands {
 }
 
 #[cfg(windows)]
+static SERVER_ID: OnceCell<Option<String>> = OnceCell::new();
+
+#[cfg(windows)]
 define_windows_service!(ffi_service_main, my_service_main);
 
 #[cfg(windows)]
-pub fn my_service_main(arguments: Vec<std::ffi::OsString>) {
+pub fn my_service_main(_arguments: Vec<std::ffi::OsString>) {
+    // this arguments is not same as launch arguments
     if let Ok(rt) = tokio::runtime::Runtime::new() {
-        let args = arguments
-            .iter()
-            .map(|arg| arg.to_string_lossy().to_string())
-            .collect::<Vec<String>>();
-        log::info!("arguments: {:?}", args);
-        let server_id = if args.len() == 2 {
-            Some(args[1].clone())
-        } else {
-            None
-        };
-        rt.block_on(async {
+        let server_id = SERVER_ID.get().expect("failed to get server id").clone();
+        rt.block_on(async move {
             let _ = crate::service::run_service(server_id).await;
         });
     }
@@ -74,17 +71,28 @@ fn main() -> anyhow::Result<()> {
             crate::uninstall::process()?;
         }
         None => {
-            LogConfig::global().lock().init(None)?;
+            let current_path = current_exe()?;
+            let log_dir = current_path
+                .as_path()
+                .parent()
+                .ok_or(anyhow::anyhow!("failed to get current dir"))?;
+            LogConfig::global()
+                .lock()
+                .init(Some(PathBuf::from(log_dir)))?;
+            let server_id = cli.server_id;
+            log::info!("Server ID: {:?}", server_id);
             #[cfg(not(windows))]
             {
-                let server_id = cli.server_id;
                 let rt = tokio::runtime::Runtime::new()?;
                 rt.block_on(async move {
                     let _ = crate::service::run_service(server_id).await;
                 });
             }
             #[cfg(windows)]
-            service_dispatcher::start(crate::service::SERVICE_NAME, ffi_service_main)?;
+            {
+                SERVER_ID.set(server_id).expect("failed to set server id");
+                service_dispatcher::start(crate::service::SERVICE_NAME, ffi_service_main)?;
+            }
         }
     }
 
