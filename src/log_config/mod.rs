@@ -8,7 +8,7 @@ use log4rs::{
 };
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-use std::{env, fs, path::PathBuf, sync::Arc};
+use std::{fs, path::PathBuf, sync::Arc};
 
 #[derive(Debug, Clone)]
 pub struct LogConfig {
@@ -201,32 +201,4 @@ impl LogConfig {
         }
         Ok(())
     }
-}
-
-#[allow(unused)]
-pub fn parse_args() -> Option<PathBuf> {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        return None;
-    }
-    if args.len() > 3 {
-        panic!("too many arguments, only the --log-dir is allowed");
-    }
-    let arg = &args[1];
-    if arg != "--log-dir" {
-        panic!("only the --log-dir argument is allowed");
-    }
-    let val = &args[2];
-    Some(PathBuf::from(val))
-}
-
-#[allow(unused)]
-pub fn log_expect<T, E>(result: Result<T, E>, msg: &str) -> T
-where
-    E: std::fmt::Display,
-{
-    result.unwrap_or_else(|err| {
-        log::error!("{msg}: {err}");
-        panic!("{}", msg);
-    })
 }

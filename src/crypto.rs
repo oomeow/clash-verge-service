@@ -71,11 +71,15 @@ pub fn load_keys() -> Result<(RsaPrivateKey, RsaPublicKey)> {
 }
 
 pub fn rsa_encrypt(public_key: &RsaPublicKey, data: &[u8]) -> Result<Vec<u8>> {
-    Ok(public_key.encrypt(&mut rand::thread_rng(), Pkcs1v15Encrypt, data)?)
+    Ok(public_key
+        .encrypt(&mut rand::thread_rng(), Pkcs1v15Encrypt, data)
+        .map_err(|e| anyhow::anyhow!("rsa encrypt failed, error {:?}", e))?)
 }
 
 pub fn rsa_decrypt(private_key: &RsaPrivateKey, enc_data: &[u8]) -> Result<Vec<u8>> {
-    Ok(private_key.decrypt(Pkcs1v15Encrypt, enc_data)?)
+    Ok(private_key
+        .decrypt(Pkcs1v15Encrypt, enc_data)
+        .map_err(|e| anyhow::anyhow!("rsa decrypt failed, error {:?}", e))?)
 }
 
 pub fn aes_encrypt(key: &[u8], nonce: &[u8], data: &[u8]) -> Result<Vec<u8>> {
@@ -123,9 +127,10 @@ pub fn decrypt_socket_data(private_key: &RsaPrivateKey, data: &str) -> Result<St
     let nonce = BASE64_STANDARD.decode(parts[1])?;
     let ciphertext = BASE64_STANDARD.decode(parts[2])?;
 
-    let aes_key =
-        rsa_decrypt(private_key, &enc_data).map_err(|e| anyhow!("rsa decrypt failed: {:?}", e))?;
-    let plaintext = aes_decrypt(&aes_key, &nonce, &ciphertext).unwrap();
+    let aes_key = rsa_decrypt(private_key, &enc_data)
+        .map_err(|e| anyhow!("decrypt data failed, error: {}", e))?;
+    let plaintext = aes_decrypt(&aes_key, &nonce, &ciphertext)
+        .map_err(|e| anyhow!("decrypt data failed, error: {}", e))?;
     let data = String::from_utf8_lossy(&plaintext);
 
     Ok(data.to_string())

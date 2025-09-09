@@ -1,19 +1,100 @@
 mod crypto;
+mod install;
 mod log_config;
 mod service;
+mod uninstall;
+mod utils;
+
+use std::path::PathBuf;
 
 use log_config::LogConfig;
 
+use clap::{Parser, Subcommand};
 #[cfg(windows)]
-fn main() -> windows_service::Result<()> {
-    let _ = LogConfig::global().lock().init(None);
-    service::main()
+use windows_service::{
+    define_windows_service,
+    service::{
+        ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
+        ServiceType,
+    },
+    service_control_handler::{self, ServiceControlHandlerResult},
+    service_dispatcher,
+};
+
+#[derive(Parser)]
+#[command(version, about = "install, uninstall or run Clash Verge Service", long_about = None)]
+struct Cli {
+    #[arg(short, long, help = "server id of IPC when service is running")]
+    server_id: Option<String>,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
 }
 
-#[cfg(not(windows))]
-fn main() {
-    let _ = LogConfig::global().lock().init(None);
-    service::main();
+#[derive(Subcommand, Debug)]
+enum Commands {
+    Install {
+        #[arg(short, long, help = "log directory")]
+        log_dir: Option<PathBuf>,
+
+        #[arg(short, long, help = "server id of IPC")]
+        server_id: Option<String>,
+    },
+    Uninstall {
+        #[arg(short, long, help = "log directory")]
+        log_dir: Option<PathBuf>,
+    },
+}
+
+#[cfg(windows)]
+define_windows_service!(ffi_service_main, my_service_main);
+
+#[cfg(windows)]
+pub fn my_service_main(arguments: Vec<std::ffi::OsString>) {
+    if let Ok(rt) = Runtime::new() {
+        let args = arguments
+            .iter()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect::<Vec<String>>();
+        log::info!("arguments: {:?}", args);
+        let server_id = if args.len() == 2 {
+            Some(args[1].clone())
+        } else {
+            None
+        };
+        rt.block_on(async {
+            let _ = run_service(server_id).await;
+        });
+    }
+}
+
+fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+    let server_id = cli.server_id;
+    match cli.command {
+        Some(Commands::Install { log_dir, server_id }) => {
+            LogConfig::global().lock().init(log_dir)?;
+            crate::install::process(server_id)?;
+        }
+        Some(Commands::Uninstall { log_dir }) => {
+            LogConfig::global().lock().init(log_dir)?;
+            crate::uninstall::process()?;
+        }
+        None => {
+            LogConfig::global().lock().init(None)?;
+            #[cfg(not(windows))]
+            {
+                let rt = tokio::runtime::Runtime::new()?;
+                rt.block_on(async {
+                    let _ = crate::service::run_service(server_id).await;
+                });
+            }
+            #[cfg(windows)]
+            service_dispatcher::start(SERVICE_NAME, ffi_service_main)?;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -28,7 +109,7 @@ mod test {
         crypto::{decrypt_socket_data, encrypt_socket_data, load_keys},
         log_config::LogConfig,
         service::{
-            ClashStatus, SERVER_ID,
+            ClashStatus,
             data::{JsonResponse, SocketCommand, StartBody},
             run_service,
         },
@@ -37,12 +118,13 @@ mod test {
     #[tokio::test]
     async fn test_start_server() -> Result<()> {
         let _ = LogConfig::global().lock().init(None);
-        run_service().await?;
+        run_service(Some(String::from("verge-test"))).await?;
         Ok(())
     }
 
     async fn connect_client() -> Result<Connection> {
-        let path = ServerId::new(SERVER_ID).parent_folder(std::env::temp_dir());
+        let server_id = "hello-verge-self";
+        let path = ServerId::new(server_id).parent_folder(std::env::temp_dir());
         println!("Server path: {:?}", path.clone().into_ipc_path()?);
         let client = Endpoint::connect(path).await?;
         Ok(client)
@@ -57,7 +139,7 @@ mod test {
 
         let mut response = String::new();
         reader.read_line(&mut response).await?;
-        response = decrypt_socket_data(&private_key, &response).unwrap();
+        response = decrypt_socket_data(&private_key, &response)?;
 
         Ok(response)
     }

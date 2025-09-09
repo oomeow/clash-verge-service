@@ -10,14 +10,6 @@ repository = "https://github.com/oomeow/clash-verge-service.git"
 name = "clash-verge-service"
 path = "src/main.rs"
 
-[[bin]]
-name = "install-service"
-path = "src/install.rs"
-
-[[bin]]
-name = "uninstall-service"
-path = "src/uninstall.rs"
-
 [dependencies]
 anyhow = "1.0"
 log = "0.4"
@@ -42,6 +34,7 @@ aes-gcm = "0.10"
 rand = "0.8"
 base64 = "0.22"
 chrono = {version = "0.4",features = ["serde"]}
+clap = { version = "4.5.47", features = ["derive"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 openssl = { version = "0.10", features = ["vendored"] }

@@ -1,22 +1,21 @@
-mod log_config;
+use crate::service::{DEFAULT_SERVER_ID, SERVICE_NAME};
+use crate::utils::log_expect;
 
-use anyhow::Error;
+use anyhow::Result;
 
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
-fn main() {
+pub fn process(_server_id: Option<String>) -> Result<()> {
     log::error!("Unsupported platform");
-    panic!("This program is not intended to run on this platform.");
+    anyhow::bail!("This program is not intended to run on this platform.");
 }
 
 #[cfg(target_os = "macos")]
-fn main() -> Result<(), Error> {
-    use log_config::{LogConfig, log_expect, parse_args};
+pub fn process(server_id: Option<String>) -> Result<()> {
     use std::fs::File;
     use std::io::Write;
     use std::path::Path;
 
-    let log_dir = parse_args();
-    LogConfig::global().lock().init(log_dir)?;
+    let server_id = server_id.unwrap_or(DEFAULT_SERVER_ID.to_string());
 
     log::debug!("Start install Clash Verge Service.");
 
@@ -54,7 +53,10 @@ fn main() -> Result<(), Error> {
     let plist_file = "/Library/LaunchDaemons/io.github.clashverge.helper.plist";
     log::debug!("Create plist file at {}", plist_file);
     let plist_file = Path::new(plist_file);
-    let plist_file_content = include_str!("io.github.clashverge.helper.plist");
+    let plist_file_content = format!(
+        include_str!("io.github.clashverge.helper.plist"),
+        server_id.unwrap()
+    );
     let mut file = log_expect(
         File::create(plist_file),
         "Failed to create file for writing.",
@@ -135,15 +137,11 @@ fn main() -> Result<(), Error> {
 }
 
 #[cfg(target_os = "linux")]
-fn main() -> Result<(), Error> {
-    const SERVICE_NAME: &str = "clash-verge-service";
-    use core::panic;
-    use log_config::{LogConfig, log_expect, parse_args};
+pub fn process(server_id: Option<String>) -> Result<()> {
     use std::path::Path;
     use std::{fs::File, io::Write};
 
-    let log_dir = parse_args();
-    LogConfig::global().lock().init(log_dir)?;
+    let server_id = server_id.unwrap_or(DEFAULT_SERVER_ID.to_string());
 
     log::debug!("Start install Clash Verge Service.");
     let service_binary_path = std::env::current_exe()
@@ -196,12 +194,12 @@ fn main() -> Result<(), Error> {
             }
             _ => {
                 log::error!("Unexpected status code from systemctl status");
-                panic!("Unexpected status code from systemctl status")
+                anyhow::bail!("Unexpected status code from systemctl status")
             }
         },
         None => {
             log::error!("systemctl was improperly terminated.");
-            panic!("systemctl was improperly terminated.");
+            anyhow::bail!("systemctl was improperly terminated.");
         }
     }
 
@@ -211,7 +209,8 @@ fn main() -> Result<(), Error> {
 
     let unit_file_content = format!(
         include_str!("systemd_service_unit.tmpl"),
-        service_binary_path.to_str().unwrap()
+        service_binary_path.to_str().unwrap(),
+        server_id
     );
     let mut file = log_expect(File::create(unit_file), "Failed to create file for writing");
     log_expect(
@@ -242,8 +241,7 @@ fn main() -> Result<(), Error> {
 
 /// install and start the service
 #[cfg(windows)]
-fn main() -> Result<(), Error> {
-    use log_config::{LogConfig, parse_args};
+pub fn process(server_id: Option<String>) -> Result<()> {
     use std::ffi::{OsStr, OsString};
     use windows_service::{
         service::{
@@ -253,8 +251,7 @@ fn main() -> Result<(), Error> {
         service_manager::{ServiceManager, ServiceManagerAccess},
     };
 
-    let log_dir = parse_args();
-    LogConfig::global().lock().init(log_dir)?;
+    let server_id = server_id.unwrap_or(DEFAULT_SERVER_ID.to_string());
 
     log::debug!("Start installing Clash Verge Service.");
 
@@ -299,7 +296,10 @@ fn main() -> Result<(), Error> {
         start_type: ServiceStartType::AutoStart,
         error_control: ServiceErrorControl::Normal,
         executable_path: service_binary_path,
-        launch_arguments: vec![],
+        launch_arguments: vec![
+            OsString::from("--server-id"),
+            OsString::from(server_id.unwrap()),
+        ],
         dependencies: vec![],
         account_name: None, // run as System
         account_password: None,

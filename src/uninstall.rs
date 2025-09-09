@@ -1,20 +1,17 @@
-mod log_config;
+use crate::service::SERVICE_NAME;
+use crate::utils::log_expect;
 
-use anyhow::Error;
+use anyhow::Result;
 
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
-fn main() {
+pub fn process() -> Result<()> {
     log::error!("Unsupported platform");
-    panic!("This program is not intended to run on this platform.");
+    anyhow::bail!("This program is not intended to run on this platform.");
 }
 
 #[cfg(target_os = "macos")]
-fn main() -> Result<(), Error> {
-    use log_config::{LogConfig, log_expect, parse_args};
+pub fn process() -> Result<()> {
     use std::{fs::remove_file, path::Path};
-
-    let log_dir = parse_args();
-    LogConfig::global().lock().init(log_dir)?;
 
     log::debug!("Start uninstall Clash Verge Service");
 
@@ -51,15 +48,10 @@ fn main() -> Result<(), Error> {
 }
 
 #[cfg(target_os = "linux")]
-fn main() -> Result<(), Error> {
-    use log_config::{LogConfig, log_expect, parse_args};
+pub fn process() -> Result<()> {
     use std::{fs::remove_file, path::Path};
 
-    let log_dir = parse_args();
-    LogConfig::global().lock().init(log_dir)?;
-
     log::debug!("Start uninstall Clash Verge Service");
-    const SERVICE_NAME: &str = "clash-verge-service";
 
     // Disable the service
     log::debug!("Disabling [{SERVICE_NAME}] service");
@@ -96,16 +88,12 @@ fn main() -> Result<(), Error> {
 
 /// stop and uninstall the service
 #[cfg(windows)]
-fn main() -> Result<(), Error> {
-    use log_config::{LogConfig, parse_args};
+pub fn process() -> Result<()> {
     use std::{thread, time::Duration};
     use windows_service::{
         service::{ServiceAccess, ServiceState},
         service_manager::{ServiceManager, ServiceManagerAccess},
     };
-
-    let log_dir = parse_args();
-    LogConfig::global().lock().init(log_dir)?;
 
     log::debug!("Start uninstall Clash Verge Service.");
 

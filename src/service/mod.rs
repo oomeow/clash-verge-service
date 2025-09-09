@@ -18,8 +18,7 @@ use handle::start_clash;
 use handle::stop_clash;
 use rsa::RsaPrivateKey;
 use rsa::RsaPublicKey;
-#[cfg(windows)]
-use std::{ffi::OsString, time::Duration};
+
 use tipsy::Connection;
 use tipsy::Endpoint;
 use tipsy::OnConflict;
@@ -28,7 +27,6 @@ use tipsy::ServerId;
 use tokio::io::AsyncBufReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
-use tokio::runtime::Runtime;
 use tokio::sync::watch::channel;
 #[cfg(windows)]
 use windows_service::{
@@ -42,9 +40,9 @@ use windows_service::{
 };
 
 #[cfg(windows)]
-const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
-const SERVICE_NAME: &str = "clash_verge_service";
-pub const SERVER_ID: &str = "verge-service-server";
+pub const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
+pub const SERVICE_NAME: &str = "clash_verge_service";
+pub const DEFAULT_SERVER_ID: &str = "verge-service-server";
 
 macro_rules! wrap_response {
     ($expr: expr) => {
@@ -64,7 +62,7 @@ macro_rules! wrap_response {
 }
 
 /// The Service
-pub async fn run_service() -> anyhow::Result<()> {
+pub async fn run_service(server_id: Option<String>) -> anyhow::Result<()> {
     // 开启服务 设置服务状态
     #[cfg(windows)]
     let status_handle = service_control_handler::register(
@@ -84,10 +82,11 @@ pub async fn run_service() -> anyhow::Result<()> {
         controls_accepted: ServiceControlAccept::STOP,
         exit_code: ServiceExitCode::Win32(0),
         checkpoint: 0,
-        wait_hint: Duration::default(),
+        wait_hint: std::time::Duration::default(),
         process_id: None,
     })?;
 
+    let server_id = server_id.unwrap_or(DEFAULT_SERVER_ID.to_string());
     let instant = std::time::Instant::now();
     let (private_key, public_key) = match load_keys() {
         Ok(keys) => keys,
@@ -98,7 +97,7 @@ pub async fn run_service() -> anyhow::Result<()> {
     };
     log::debug!("load rsa keys took {:?}", instant.elapsed());
 
-    let path = ServerId::new(SERVER_ID).parent_folder(std::env::temp_dir());
+    let path = ServerId::new(server_id).parent_folder(std::env::temp_dir());
     let security_attributes = SecurityAttributes::allow_everyone_connect()?;
     let mut incoming = Endpoint::new(path, OnConflict::Overwrite)?
         .security_attributes(security_attributes)
@@ -137,9 +136,8 @@ async fn spawn_read_task(
         loop {
             let mut msg = String::new();
             match reader.read_line(&mut msg).await {
-                Ok(size) if size > 0 => {
-                    let req_data = decrypt_socket_data(&private_key.clone(), &msg).unwrap();
-                    match serde_json::from_str::<SocketCommand>(&req_data) {
+                Ok(size) if size > 0 => match decrypt_socket_data(&private_key.clone(), &msg) {
+                    Ok(req_data) => match serde_json::from_str::<SocketCommand>(&req_data) {
                         Ok(cmd) => {
                             if handle_socket_command(&public_key.clone(), &mut reader, cmd.clone())
                                 .await
@@ -156,8 +154,15 @@ async fn spawn_read_task(
                         Err(err) => {
                             log::error!("Error parsing socket command: {err}");
                         }
+                    },
+                    Err(err) => {
+                        log::error!("Error decrypting socket data: {err}");
+                        let err_res = Result::<(), anyhow::Error>::Err(err);
+                        let response = wrap_response!(err_res).unwrap();
+                        let combined = encrypt_socket_data(&public_key, &response).unwrap();
+                        reader.write_all(combined.as_bytes()).await.unwrap();
                     }
-                }
+                },
                 Ok(_) => {
                     log::debug!("empty line, the socket is closed");
                     break;
@@ -223,7 +228,7 @@ fn stop_service() -> Result<()> {
         controls_accepted: ServiceControlAccept::empty(),
         exit_code: ServiceExitCode::Win32(0),
         checkpoint: 0,
-        wait_hint: Duration::default(),
+        wait_hint: std::time::Duration::default(),
         process_id: None,
     })?;
 
@@ -240,29 +245,38 @@ fn stop_service() -> anyhow::Result<()> {
         .expect("failed to execute process");
     Ok(())
 }
-/// Service Main function
-#[cfg(windows)]
-pub fn main() -> Result<()> {
-    service_dispatcher::start(SERVICE_NAME, ffi_service_main)
-}
 
-#[cfg(not(windows))]
-pub fn main() {
-    if let Ok(rt) = Runtime::new() {
-        rt.block_on(async {
-            let _ = run_service().await;
-        });
-    }
-}
+// #[cfg(windows)]
+// define_windows_service!(ffi_service_main, my_service_main);
 
-#[cfg(windows)]
-define_windows_service!(ffi_service_main, my_service_main);
+// #[cfg(windows)]
+// pub fn my_service_main(arguments: Vec<std::ffi::OsString>) {
+//     if let Ok(rt) = Runtime::new() {
+//         let args = arguments
+//             .iter()
+//             .map(|arg| arg.to_string_lossy().to_string())
+//             .collect::<Vec<String>>();
+//         log::info!("arguments: {:?}", args);
+//         let server_id = if args.len() == 2 {
+//             Some(args[1].clone())
+//         } else {
+//             None
+//         };
+//         rt.block_on(async {
+//             let _ = run_service(server_id).await;
+//         });
+//     }
+// }
 
-#[cfg(windows)]
-pub fn my_service_main(_arguments: Vec<OsString>) {
-    if let Ok(rt) = Runtime::new() {
-        rt.block_on(async {
-            let _ = run_service().await;
-        });
-    }
-}
+// pub fn main() -> anyhow::Result<()> {
+//     #[cfg(not(windows))]
+//     if let Ok(rt) = Runtime::new() {
+//         let (_, server_id) = crate::utils::parse_args()?;
+//         rt.block_on(async {
+//             let _ = run_service(server_id).await;
+//         });
+//     }
+//     #[cfg(windows)]
+//     service_dispatcher::start(SERVICE_NAME, ffi_service_main)?;
+//     Ok(())
+// }

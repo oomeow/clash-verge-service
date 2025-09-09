@@ -1,6 +1,7 @@
 use super::data::*;
-use crate::log_config::{LogConfig, log_expect};
+use crate::log_config::LogConfig;
 use crate::service::logger::Logger;
+use crate::utils::log_expect;
 use anyhow::{Result, bail};
 use chrono::{DateTime, Local};
 use once_cell::sync::OnceCell;
