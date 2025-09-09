@@ -30,13 +30,12 @@ use tokio::io::BufReader;
 use tokio::sync::watch::channel;
 #[cfg(windows)]
 use windows_service::{
-    Result, define_windows_service,
+    Result,
     service::{
         ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
         ServiceType,
     },
     service_control_handler::{self, ServiceControlHandlerResult},
-    service_dispatcher,
 };
 
 #[cfg(windows)]
@@ -157,7 +156,7 @@ async fn spawn_read_task(
                     },
                     Err(err) => {
                         log::error!("Error decrypting socket data: {err}");
-                        let err_res = Result::<(), anyhow::Error>::Err(err);
+                        let err_res = anyhow::Result::<()>::Err(err);
                         let response = wrap_response!(err_res).unwrap();
                         let combined = encrypt_socket_data(&public_key, &response).unwrap();
                         reader.write_all(combined.as_bytes()).await.unwrap();

@@ -1,5 +1,4 @@
-use crate::service::{DEFAULT_SERVER_ID, SERVICE_NAME};
-use crate::utils::log_expect;
+use crate::service::DEFAULT_SERVER_ID;
 
 use anyhow::Result;
 
@@ -11,6 +10,7 @@ pub fn process(_server_id: Option<String>) -> Result<()> {
 
 #[cfg(target_os = "macos")]
 pub fn process(server_id: Option<String>) -> Result<()> {
+    use crate::utils::log_expect;
     use std::fs::File;
     use std::io::Write;
     use std::path::Path;
@@ -53,10 +53,7 @@ pub fn process(server_id: Option<String>) -> Result<()> {
     let plist_file = "/Library/LaunchDaemons/io.github.clashverge.helper.plist";
     log::debug!("Create plist file at {}", plist_file);
     let plist_file = Path::new(plist_file);
-    let plist_file_content = format!(
-        include_str!("io.github.clashverge.helper.plist"),
-        server_id.unwrap()
-    );
+    let plist_file_content = format!(include_str!("io.github.clashverge.helper.plist"), server_id);
     let mut file = log_expect(
         File::create(plist_file),
         "Failed to create file for writing.",
@@ -138,6 +135,8 @@ pub fn process(server_id: Option<String>) -> Result<()> {
 
 #[cfg(target_os = "linux")]
 pub fn process(server_id: Option<String>) -> Result<()> {
+    use crate::service::SERVICE_NAME;
+    use crate::utils::log_expect;
     use std::path::Path;
     use std::{fs::File, io::Write};
 
@@ -296,10 +295,7 @@ pub fn process(server_id: Option<String>) -> Result<()> {
         start_type: ServiceStartType::AutoStart,
         error_control: ServiceErrorControl::Normal,
         executable_path: service_binary_path,
-        launch_arguments: vec![
-            OsString::from("--server-id"),
-            OsString::from(server_id.unwrap()),
-        ],
+        launch_arguments: vec![OsString::from("--server-id"), OsString::from(server_id)],
         dependencies: vec![],
         account_name: None, // run as System
         account_password: None,

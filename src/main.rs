@@ -11,15 +11,7 @@ use log_config::LogConfig;
 
 use clap::{Parser, Subcommand};
 #[cfg(windows)]
-use windows_service::{
-    define_windows_service,
-    service::{
-        ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
-        ServiceType,
-    },
-    service_control_handler::{self, ServiceControlHandlerResult},
-    service_dispatcher,
-};
+use windows_service::{define_windows_service, service_dispatcher};
 
 #[derive(Parser)]
 #[command(version, about = "install, uninstall or run Clash Verge Service", long_about = None)]
@@ -51,7 +43,7 @@ define_windows_service!(ffi_service_main, my_service_main);
 
 #[cfg(windows)]
 pub fn my_service_main(arguments: Vec<std::ffi::OsString>) {
-    if let Ok(rt) = Runtime::new() {
+    if let Ok(rt) = tokio::runtime::Runtime::new() {
         let args = arguments
             .iter()
             .map(|arg| arg.to_string_lossy().to_string())
@@ -63,7 +55,7 @@ pub fn my_service_main(arguments: Vec<std::ffi::OsString>) {
             None
         };
         rt.block_on(async {
-            let _ = run_service(server_id).await;
+            let _ = crate::service::run_service(server_id).await;
         });
     }
 }
@@ -90,7 +82,7 @@ fn main() -> anyhow::Result<()> {
                 });
             }
             #[cfg(windows)]
-            service_dispatcher::start(SERVICE_NAME, ffi_service_main)?;
+            service_dispatcher::start(crate::service::SERVICE_NAME, ffi_service_main)?;
         }
     }
 

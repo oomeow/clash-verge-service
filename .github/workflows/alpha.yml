@@ -75,25 +75,25 @@ jobs:
         if: matrix.os != 'ubuntu-latest'
         run: rustup target add ${{ matrix.target }}
 
-      - name: Build
+      - name: Build (Windows / MacOS)
         if: matrix.os != 'ubuntu-latest'
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Build
+      - name: Build (Linux)
         if: matrix.os == 'ubuntu-latest'
         uses: ./.github/build-for-linux
         with:
           target: ${{ matrix.target }}
 
-      - name: Rename Clash Verge Service(Linux / MacOS)
+      - name: Rename Clash Verge Service (Linux / MacOS)
         if: matrix.os != 'windows-latest'
         run: |
-          mv target/${{ matrix.target }}/release/clash-verge-service clash-verge-service-${{ matrix.target }}
+          mv target/${{ matrix.target }}/release/clash-verge-service ./clash-verge-service-${{ matrix.target }}
 
-      - name: Rename Clash Verge Service(Windows)
+      - name: Rename Clash Verge Service (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          mv target/${{ matrix.target }}/release/clash-verge-service.exe clash-verge-service-${{ matrix.target }}.exe
+          mv target/${{ matrix.target }}/release/clash-verge-service.exe ./clash-verge-service-${{ matrix.target }}.exe
 
       - name: Update Tag
         uses: richardsimko/update-tag@v1
@@ -111,5 +111,5 @@ jobs:
           prerelease: true
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
-            clash-verge-service-${{ matrix.target }}
-            clash-verge-service-${{ matrix.target }}.exe
+            ./clash-verge-service-${{ matrix.target }}
+            ./clash-verge-service-${{ matrix.target }}.exe

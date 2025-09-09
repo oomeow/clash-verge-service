@@ -1,6 +1,3 @@
-use crate::service::SERVICE_NAME;
-use crate::utils::log_expect;
-
 use anyhow::Result;
 
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
@@ -11,6 +8,7 @@ pub fn process() -> Result<()> {
 
 #[cfg(target_os = "macos")]
 pub fn process() -> Result<()> {
+    use crate::utils::log_expect;
     use std::{fs::remove_file, path::Path};
 
     log::debug!("Start uninstall Clash Verge Service");
@@ -49,6 +47,8 @@ pub fn process() -> Result<()> {
 
 #[cfg(target_os = "linux")]
 pub fn process() -> Result<()> {
+    use crate::service::SERVICE_NAME;
+    use crate::utils::log_expect;
     use std::{fs::remove_file, path::Path};
 
     log::debug!("Start uninstall Clash Verge Service");
