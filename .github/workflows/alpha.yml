@@ -25,11 +25,18 @@ jobs:
           registry-url: https://registry.npmjs.org/
           node-version: lts/*
 
+      - name: Update Tag
+        uses: richardsimko/update-tag@v1
+        with:
+          tag_name: alpha
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Generate Changelog
         id: generate
         run: |
           pre_version=$(git tag --sort=-creatordate | grep -Ev "alpha" | sed -n 1p)
-          npx changelogithub --from ${pre_version} --to main
+          npx changelogithub --from ${pre_version} --to alpha
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
@@ -91,12 +98,6 @@ jobs:
         run: |
           cp target/${{ matrix.target }}/release/clash-verge-service.exe ./clash-verge-service-${{ matrix.target }}.exe
 
-      - name: Update Tag
-        uses: richardsimko/update-tag@v1
-        with:
-          tag_name: alpha
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Create Pre-Release
         uses: softprops/action-gh-release@v2
