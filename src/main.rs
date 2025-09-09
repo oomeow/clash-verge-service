@@ -16,15 +16,16 @@ use windows_service::{define_windows_service, service_dispatcher};
 #[derive(Parser)]
 #[command(version, about = "install, uninstall or run Clash Verge Service", long_about = None)]
 struct Cli {
-    #[arg(short, long, help = "server id of IPC when service is running")]
+    #[arg(short, long, help = "run service by using this server id for IPC")]
     server_id: Option<String>,
 
     #[command(subcommand)]
     command: Option<Commands>,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand)]
 enum Commands {
+    #[command(about = "install Clash Verge Service")]
     Install {
         #[arg(short, long, help = "log directory")]
         log_dir: Option<PathBuf>,
@@ -32,6 +33,7 @@ enum Commands {
         #[arg(short, long, help = "server id of IPC")]
         server_id: Option<String>,
     },
+    #[command(about = "uninstall Clash Verge Service")]
     Uninstall {
         #[arg(short, long, help = "log directory")]
         log_dir: Option<PathBuf>,
