@@ -15,7 +15,7 @@ jobs:
   generate-changelog:
     runs-on: ubuntu-latest
     outputs:
-      CHANGELOG: ${{ steps.generate.outputs.changelog }}
+      CHANGELOG_B64: ${{ steps.generate.outputs.changelog }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,7 +32,8 @@ jobs:
         run: |
           pre_version=$(git tag --sort=-creatordate | grep -Ev "alpha" | sed -n 1p)
           npx changelogithub --from ${pre_version} --to main --output CHANGELOG.txt
-          echo "CHANGELOG=$(cat CHANGELOG.txt)" >> $GITHUB_OUTPUT
+          CHANGELOG_B64=$(base64 -w0 CHANGELOG.txt)
+          echo "CHANGELOG_B64=$CHANGELOG_B64" >> "$GITHUB_OUTPUT"
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
@@ -106,7 +107,7 @@ jobs:
         with:
           name: Clash Verge Service Alpha
           tag_name: alpha
-          body: ${{ needs.generate-changelog.outputs.CHANGELOG }}
+          body: "$(echo ${{ needs.generate-changelog.outputs.CHANGELOG_B64 }} | base64 -d)"
           prerelease: true
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
