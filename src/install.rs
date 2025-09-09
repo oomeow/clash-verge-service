@@ -170,12 +170,10 @@ pub fn process(server_id: Option<String>) -> Result<()> {
     match status_code {
         Some(code) => match code {
             0 => {
-                return {
-                    log::debug!(
-                        "The service is already installed and activated. (status code: 0), uninstall it"
-                    );
-                    crate::uninstall::process()?;
-                };
+                log::debug!(
+                    "The service is already installed and activated. (status code: 0), uninstall it"
+                );
+                crate::uninstall::process()?;
             }
             ucode @ (1..=3) => {
                 log::debug!(
