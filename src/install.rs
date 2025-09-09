@@ -171,22 +171,17 @@ pub fn process(server_id: Option<String>) -> Result<()> {
         Some(code) => match code {
             0 => {
                 return {
-                    log::debug!("The service is already installed and activated. (status code: 0)");
-                    Ok(())
+                    log::debug!(
+                        "The service is already installed and activated. (status code: 0), uninstall it"
+                    );
+                    crate::uninstall::process()?;
                 };
             }
             ucode @ (1..=3) => {
                 log::debug!(
-                    "The service is installed but it not active, start run service. (status code: {ucode})"
+                    "The service is installed but it not active. (status code: {ucode}), uninstall it"
                 );
-                log_expect(
-                    std::process::Command::new("systemctl")
-                        .arg("start")
-                        .arg(format!("{SERVICE_NAME}.service"))
-                        .output(),
-                    "Failed to execute 'systemctl start' command",
-                );
-                return Ok(());
+                crate::uninstall::process()?;
             }
             4 => {
                 log::debug!("The service status is unknown, continue to install. (status code: 4)")
@@ -258,26 +253,24 @@ pub fn process(server_id: Option<String>) -> Result<()> {
     let manager_access = ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE;
     let service_manager = ServiceManager::local_computer(None::<&str>, manager_access)?;
 
-    log::debug!("Checking if the service is installed and active.");
-    let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::START;
+    log::debug!("Checking if the service is installed and active，delete it if exists");
+    let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE;
     if let Ok(service) = service_manager.open_service("clash_verge_service", service_access) {
         log::debug!("The service is installed, checking if it is active.");
         if let Ok(status) = service.query_status() {
-            match status.current_state {
-                ServiceState::StopPending
-                | ServiceState::Stopped
-                | ServiceState::PausePending
-                | ServiceState::Paused => {
-                    log::debug!("Service is not active, starting it.");
-                    service.start(&Vec::<&OsStr>::new())?;
+            if status.current_state != ServiceState::Stopped {
+                log::debug!("Service status is not stopped, stopping it first.");
+                if let Err(err) = service.stop() {
+                    log::error!("Failed to stop service: {err}");
                 }
-                _ => {}
-            };
+                // Wait for service to stop
+                std::thread::sleep(std::time::Duration::from_secs(1));
+            }
 
-            return Ok(());
+            log::debug!("Deleting service");
+            service.delete()?;
         }
     }
-    log::debug!("The service is not installed, installing it.");
 
     let service_binary_path = std::env::current_exe()
         .unwrap()
