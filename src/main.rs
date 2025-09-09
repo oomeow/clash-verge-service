@@ -62,7 +62,6 @@ pub fn my_service_main(arguments: Vec<std::ffi::OsString>) {
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
-    let server_id = cli.server_id;
     match cli.command {
         Some(Commands::Install { log_dir, server_id }) => {
             LogConfig::global().lock().init(log_dir)?;
@@ -76,8 +75,9 @@ fn main() -> anyhow::Result<()> {
             LogConfig::global().lock().init(None)?;
             #[cfg(not(windows))]
             {
+                let server_id = cli.server_id;
                 let rt = tokio::runtime::Runtime::new()?;
-                rt.block_on(async {
+                rt.block_on(async move {
                     let _ = crate::service::run_service(server_id).await;
                 });
             }
