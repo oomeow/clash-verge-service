@@ -8,6 +8,7 @@ use crate::crypto::decrypt_socket_data;
 use crate::crypto::encrypt_socket_data;
 use crate::crypto::generate_rsa_keys;
 use crate::crypto::load_keys;
+
 use data::JsonResponse;
 use data::SocketCommand;
 use futures_util::StreamExt;
@@ -19,6 +20,7 @@ use handle::stop_clash;
 use rsa::RsaPrivateKey;
 use rsa::RsaPublicKey;
 
+use anyhow::Result;
 use tipsy::Connection;
 use tipsy::Endpoint;
 use tipsy::OnConflict;
@@ -30,7 +32,6 @@ use tokio::io::BufReader;
 use tokio::sync::watch::channel;
 #[cfg(windows)]
 use windows_service::{
-    Result,
     service::{
         ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
         ServiceType,
@@ -61,7 +62,7 @@ macro_rules! wrap_response {
 }
 
 /// The Service
-pub async fn run_service(server_id: Option<String>) -> anyhow::Result<()> {
+pub async fn run_service(server_id: Option<String>) -> Result<()> {
     // 开启服务 设置服务状态
     #[cfg(windows)]
     let status_handle = service_control_handler::register(
@@ -156,7 +157,7 @@ async fn spawn_read_task(
                     },
                     Err(err) => {
                         log::error!("Error decrypting socket data: {err}");
-                        let err_res = anyhow::Result::<()>::Err(err);
+                        let err_res = Result::<()>::Err(err);
                         let response = wrap_response!(err_res).unwrap();
                         let combined = encrypt_socket_data(&public_key, &response).unwrap();
                         reader.write_all(combined.as_bytes()).await.unwrap();
@@ -180,7 +181,7 @@ async fn handle_socket_command(
     public_key: &RsaPublicKey,
     reader: &mut BufReader<Connection>,
     cmd: SocketCommand,
-) -> anyhow::Result<()> {
+) -> Result<()> {
     log::info!("Handling socket command: {cmd:?}");
     let response = match cmd {
         SocketCommand::GetVersion => wrap_response!(get_version())?,
@@ -208,7 +209,7 @@ async fn handle_socket_command(
             }
             res
         }
-        SocketCommand::StopService => wrap_response!(anyhow::Result::<()>::Ok(()))?,
+        SocketCommand::StopService => wrap_response!(Result::<()>::Ok(()))?,
     };
     let combined = encrypt_socket_data(public_key, &response)?;
     reader.write_all(combined.as_bytes()).await?;
@@ -230,52 +231,15 @@ fn stop_service() -> Result<()> {
         wait_hint: std::time::Duration::default(),
         process_id: None,
     })?;
-
     Ok(())
 }
 
 #[cfg(not(windows))]
-fn stop_service() -> anyhow::Result<()> {
+fn stop_service() -> Result<()> {
     // systemctl stop clash_verge_service
     std::process::Command::new("systemctl")
         .arg("stop")
         .arg(SERVICE_NAME)
-        .output()
-        .expect("failed to execute process");
+        .output()?;
     Ok(())
 }
-
-// #[cfg(windows)]
-// define_windows_service!(ffi_service_main, my_service_main);
-
-// #[cfg(windows)]
-// pub fn my_service_main(arguments: Vec<std::ffi::OsString>) {
-//     if let Ok(rt) = Runtime::new() {
-//         let args = arguments
-//             .iter()
-//             .map(|arg| arg.to_string_lossy().to_string())
-//             .collect::<Vec<String>>();
-//         log::info!("arguments: {:?}", args);
-//         let server_id = if args.len() == 2 {
-//             Some(args[1].clone())
-//         } else {
-//             None
-//         };
-//         rt.block_on(async {
-//             let _ = run_service(server_id).await;
-//         });
-//     }
-// }
-
-// pub fn main() -> anyhow::Result<()> {
-//     #[cfg(not(windows))]
-//     if let Ok(rt) = Runtime::new() {
-//         let (_, server_id) = crate::utils::parse_args()?;
-//         rt.block_on(async {
-//             let _ = run_service(server_id).await;
-//         });
-//     }
-//     #[cfg(windows)]
-//     service_dispatcher::start(SERVICE_NAME, ffi_service_main)?;
-//     Ok(())
-// }

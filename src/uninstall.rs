@@ -21,7 +21,7 @@ pub fn process() -> Result<()> {
         .arg("unload")
         .arg(plist_file)
         .output()
-        .context("Failed to unload service.");
+        .context("Failed to unload service.")?;
 
     // Remove the service file.
     log::debug!(

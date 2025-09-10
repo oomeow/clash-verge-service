@@ -104,7 +104,7 @@ pub fn process(server_id: Option<String>) -> Result<()> {
         .arg("start")
         .arg("io.github.clashverge.helper")
         .output()
-        .context("Failed to load service.");
+        .context("Failed to load service.")?;
 
     log::debug!("Service installed successfully.");
     Ok(())

@@ -3,7 +3,6 @@ mod install;
 mod log_config;
 mod service;
 mod uninstall;
-mod utils;
 
 use std::{env::current_exe, path::PathBuf};
 
@@ -42,6 +41,7 @@ enum Commands {
     },
 }
 
+/// used to store the server_id resolved by the clap
 #[cfg(windows)]
 static SERVER_ID: OnceCell<Option<String>> = OnceCell::new();
 
@@ -120,7 +120,7 @@ mod test {
     #[tokio::test]
     async fn test_start_server() -> Result<()> {
         let _ = LogConfig::global().lock().init(None);
-        run_service(Some(String::from("verge-test"))).await?;
+        run_service(Some(String::from("hello-verge-self"))).await?;
         Ok(())
     }
 
