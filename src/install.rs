@@ -19,6 +19,9 @@ pub fn process(server_id: Option<String>) -> Result<()> {
 
     log::debug!("Start install Clash Verge Service.");
 
+    // TODO: 手上没有 Mac 电脑，无法验证之前的逻辑是否会覆盖旧的服务，因此暂时使用卸载的方法确保旧的服务卸载已被卸载
+    crate::uninstall::process()?;
+
     let service_binary_path = std::env::current_exe()
         .unwrap()
         .with_file_name("clash-verge-service");
@@ -120,6 +123,7 @@ pub fn process(server_id: Option<String>) -> Result<()> {
     let server_id = server_id.unwrap_or(DEFAULT_SERVER_ID.to_string());
 
     log::debug!("Start install Clash Verge Service.");
+
     let service_binary_path = std::env::current_exe()
         .unwrap()
         .with_file_name("clash-verge-service");
