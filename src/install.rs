@@ -10,7 +10,7 @@ pub fn process(_server_id: Option<String>) -> Result<()> {
 
 #[cfg(target_os = "macos")]
 pub fn process(server_id: Option<String>) -> Result<()> {
-    use crate::utils::log_expect;
+    use anyhow::Context;
     use std::fs::File;
     use std::io::Write;
     use std::path::Path;
@@ -34,10 +34,8 @@ pub fn process(server_id: Option<String>) -> Result<()> {
             "Create directory for service file [{}].",
             target_binary_dir.display()
         );
-        log_expect(
-            std::fs::create_dir(target_binary_dir),
-            "Unable to create directory for service file",
-        );
+        std::fs::create_dir(target_binary_dir)
+            .context("Unable to create directory for service file")?;
     }
 
     log::debug!(
@@ -45,89 +43,68 @@ pub fn process(server_id: Option<String>) -> Result<()> {
         service_binary_path.display(),
         target_binary_path
     );
-    log_expect(
-        std::fs::copy(service_binary_path, target_binary_path),
-        "Unable to copy service file",
-    );
+    std::fs::copy(service_binary_path, target_binary_path)
+        .context("Unable to copy service file")?;
 
     let plist_file = "/Library/LaunchDaemons/io.github.clashverge.helper.plist";
     log::debug!("Create plist file at {}", plist_file);
     let plist_file = Path::new(plist_file);
     let plist_file_content = format!(include_str!("io.github.clashverge.helper.plist"), server_id);
-    let mut file = log_expect(
-        File::create(plist_file),
-        "Failed to create file for writing.",
-    );
+    let mut file = File::create(plist_file).context("Failed to create file for writing.")?;
     log::debug!("Create plist file done.");
 
     log::debug!("Write plist file content.");
-    log_expect(
-        file.write_all(plist_file_content.as_bytes()),
-        "Unable to write plist file",
-    );
+    file.write_all(plist_file_content.as_bytes())
+        .context("Unable to write plist file")?;
     log::debug!("Write plist file content done.");
 
     log::debug!("Chmod and chown plist file.");
-    log_expect(
-        std::process::Command::new("chmod")
-            .arg("644")
-            .arg(plist_file)
-            .output(),
-        "Failed to chmod",
-    );
-    log_expect(
-        std::process::Command::new("chown")
-            .arg("root:wheel")
-            .arg(plist_file)
-            .output(),
-        "Failed to chown",
-    );
+    std::process::Command::new("chmod")
+        .arg("644")
+        .arg(plist_file)
+        .output()
+        .context("Failed to chmod")?;
+    std::process::Command::new("chown")
+        .arg("root:wheel")
+        .arg(plist_file)
+        .output()
+        .context("Failed to chown")?;
     log::debug!("Chmod and chown plist file done.");
 
     log::debug!("Chmod and chown service file.");
-    log_expect(
-        std::process::Command::new("chmod")
-            .arg("544")
-            .arg(target_binary_path)
-            .output(),
-        "Failed to chmod",
-    );
-    log_expect(
-        std::process::Command::new("chown")
-            .arg("root:wheel")
-            .arg(target_binary_path)
-            .output(),
-        "Failed to chown",
-    );
+    std::process::Command::new("chmod")
+        .arg("544")
+        .arg(target_binary_path)
+        .output()
+        .context("Failed to chmod")?;
+    std::process::Command::new("chown")
+        .arg("root:wheel")
+        .arg(target_binary_path)
+        .output()
+        .context("Failed to chown")?;
     log::debug!("Chmod and chown service file done.");
 
     // Unload before load the service.
     log::debug!("Unload service before load the service.");
-    log_expect(
-        std::process::Command::new("launchctl")
-            .arg("unload")
-            .arg(plist_file)
-            .output(),
-        "Failed to unload service.",
-    );
+    std::process::Command::new("launchctl")
+        .arg("unload")
+        .arg(plist_file)
+        .output()
+        .context("Failed to unload service.")?;
     // Load the service.
     log::debug!("Load service.");
-    log_expect(
-        std::process::Command::new("launchctl")
-            .arg("load")
-            .arg(plist_file)
-            .output(),
-        "Failed to load service.",
-    );
+    std::process::Command::new("launchctl")
+        .arg("load")
+        .arg(plist_file)
+        .output()
+        .context("Failed to load service.")?;
     // Start the service.
     log::debug!("Start service.");
-    log_expect(
-        std::process::Command::new("launchctl")
-            .arg("start")
-            .arg("io.github.clashverge.helper")
-            .output(),
-        "Failed to load service.",
-    );
+    std::process::Command::new("launchctl")
+        .arg("start")
+        .arg("io.github.clashverge.helper")
+        .output()
+        .context("Failed to load service.");
 
     log::debug!("Service installed successfully.");
     Ok(())
@@ -136,7 +113,7 @@ pub fn process(server_id: Option<String>) -> Result<()> {
 #[cfg(target_os = "linux")]
 pub fn process(server_id: Option<String>) -> Result<()> {
     use crate::service::SERVICE_NAME;
-    use crate::utils::log_expect;
+    use anyhow::Context;
     use std::path::Path;
     use std::{fs::File, io::Write};
 
@@ -153,32 +130,22 @@ pub fn process(server_id: Option<String>) -> Result<()> {
 
     // Peek the status of the service.
     log::debug!("Checking the status of the service.");
-    let status_code = log_expect(
-        std::process::Command::new("systemctl")
-            .arg("status")
-            .arg(format!("{SERVICE_NAME}.service"))
-            .arg("--no-pager")
-            .output(),
-        "Failed to execute 'systemctl status' command",
-    )
-    .status
-    .code();
+    let status_code = std::process::Command::new("systemctl")
+        .arg("status")
+        .arg(format!("{SERVICE_NAME}.service"))
+        .arg("--no-pager")
+        .output()
+        .context("Failed to execute 'systemctl status' command")?
+        .status
+        .code();
 
     /*
      * https://www.freedesktop.org/software/systemd/man/latest/systemctl.html#Exit%20status
      */
     match status_code {
         Some(code) => match code {
-            0 => {
-                log::debug!(
-                    "The service is already installed and activated. (status code: 0), uninstall it"
-                );
-                crate::uninstall::process()?;
-            }
-            ucode @ (1..=3) => {
-                log::debug!(
-                    "The service is installed but it not active. (status code: {ucode}), uninstall it"
-                );
+            0..=3 => {
+                log::debug!("The service is already installed, uninstall it first");
                 crate::uninstall::process()?;
             }
             4 => {
@@ -196,36 +163,31 @@ pub fn process(server_id: Option<String>) -> Result<()> {
     }
 
     let unit_file = format!("/etc/systemd/system/{SERVICE_NAME}.service");
+
     log::debug!("Generating service file [{unit_file}].");
     let unit_file = Path::new(&unit_file);
-
     let unit_file_content = format!(
         include_str!("systemd_service_unit.tmpl"),
         service_binary_path.to_str().unwrap(),
         server_id
     );
-    let mut file = log_expect(File::create(unit_file), "Failed to create file for writing");
-    log_expect(
-        file.write_all(unit_file_content.as_bytes()),
-        "Failed to write to file",
-    );
+    let mut file = File::create(unit_file).context("Failed to create file for writing")?;
+    file.write_all(unit_file_content.as_bytes())
+        .context("Failed to write to file")?;
     log::debug!("Generated service file done.");
 
     // Reload unit files and start service.
-    log::debug!("Reloading unit files and starting service.");
-    log_expect(
-        std::process::Command::new("systemctl")
-            .arg("daemon-reload")
-            .output()
-            .and_then(|_| {
-                std::process::Command::new("systemctl")
-                    .arg("enable")
-                    .arg(SERVICE_NAME)
-                    .arg("--now")
-                    .output()
-            }),
-        "Failed to reload unit files and start service",
-    );
+    log::debug!("Reloading unit files and start service.");
+    std::process::Command::new("systemctl")
+        .arg("daemon-reload")
+        .output()
+        .context("Failed to reload unit files")?;
+    std::process::Command::new("systemctl")
+        .arg("enable")
+        .arg(SERVICE_NAME)
+        .arg("--now")
+        .output()
+        .context("Failed to start service")?;
 
     log::debug!("Service installed successfully.");
     Ok(())
@@ -254,7 +216,7 @@ pub fn process(server_id: Option<String>) -> Result<()> {
     log::debug!("Checking if the service is installed and active，delete it if exists");
     let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE;
     if let Ok(service) = service_manager.open_service("clash_verge_service", service_access) {
-        log::debug!("The service is installed, checking if it is active.");
+        log::debug!("The service is installed, stop and delete it first");
         if let Ok(status) = service.query_status() {
             if status.current_state != ServiceState::Stopped {
                 log::debug!("Service status is not stopped, stopping it first.");

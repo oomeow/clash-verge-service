@@ -1,8 +1,7 @@
 use super::data::*;
 use crate::log_config::LogConfig;
 use crate::service::logger::Logger;
-use crate::utils::log_expect;
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Local};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
@@ -52,7 +51,6 @@ impl ClashStatus {
     }
 }
 
-/// GET /version
 /// 获取服务进程的版本
 pub fn get_version() -> Result<HashMap<String, String>> {
     let version = env!("CARGO_PKG_VERSION");
@@ -82,7 +80,7 @@ fn run_core(body: StartBody) -> Result<()> {
         .args(args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let shared_child = log_expect(SharedChild::spawn(&mut command), "failed to start clash");
+    let shared_child = SharedChild::spawn(&mut command).context("failed to spawn clash")?;
     let child = Arc::new(shared_child);
     {
         let mut clash_status = ClashStatus::global().lock();
@@ -110,12 +108,10 @@ fn run_core(body: StartBody) -> Result<()> {
         if clash_status.auto_restart {
             let now = Local::now();
             let elapsed = (now - clash_status.last_running_time).as_seconds_f64();
-            log::info!("elapsed time from last running time: {} seconds", elapsed);
+            log::info!("elapsed time from last running time: {elapsed} seconds");
             if elapsed > INTERVAL_TIME {
                 log::info!(
-                    "elapsed time greater than {} seconds, reset retry count to {}",
-                    INTERVAL_TIME,
-                    DEFAULT_RETRY_COUNT
+                    "elapsed time greater than {INTERVAL_TIME} seconds, reset retry count to {DEFAULT_RETRY_COUNT}",
                 );
                 // update the restart retry count
                 let mut clash_status_ = ClashStatus::global().lock();
@@ -124,8 +120,9 @@ fn run_core(body: StartBody) -> Result<()> {
             }
             if clash_status.restart_retry_count > 0 {
                 log::warn!(
-                    "mihomo terminated, restart count: {}, try to restart...",
-                    clash_status.restart_retry_count
+                    "mihomo terminated, attempt to restart {}/{}...",
+                    clash_status.restart_retry_count,
+                    DEFAULT_RETRY_COUNT
                 );
                 {
                     // update the restart retry count
@@ -134,11 +131,7 @@ fn run_core(body: StartBody) -> Result<()> {
                 }
                 Logger::global().clear_log();
                 if let Err(e) = run_core(body_clone) {
-                    log::error!(
-                        "failed to restart clash: {}, retry count: {}",
-                        e,
-                        clash_status.restart_retry_count
-                    );
+                    log::error!("failed to restart clash: {e}");
                 }
             } else {
                 log::error!("failed to restart clash, retry count exceeded!");

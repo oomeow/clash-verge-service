@@ -8,7 +8,7 @@ pub fn process() -> Result<()> {
 
 #[cfg(target_os = "macos")]
 pub fn process() -> Result<()> {
-    use crate::utils::log_expect;
+    use anyhow::Context;
     use std::{fs::remove_file, path::Path};
 
     log::debug!("Start uninstall Clash Verge Service");
@@ -17,13 +17,11 @@ pub fn process() -> Result<()> {
 
     // Unload the service.
     log::debug!("Unloading service");
-    log_expect(
-        std::process::Command::new("launchctl")
-            .arg("unload")
-            .arg(plist_file)
-            .output(),
-        "Failed to unload service.",
-    );
+    std::process::Command::new("launchctl")
+        .arg("unload")
+        .arg(plist_file)
+        .output()
+        .context("Failed to unload service.");
 
     // Remove the service file.
     log::debug!(
@@ -47,22 +45,21 @@ pub fn process() -> Result<()> {
 
 #[cfg(target_os = "linux")]
 pub fn process() -> Result<()> {
+    use anyhow::Context;
+
     use crate::service::SERVICE_NAME;
-    use crate::utils::log_expect;
     use std::{fs::remove_file, path::Path};
 
     log::debug!("Start uninstall Clash Verge Service");
 
     // Disable the service
     log::debug!("Disabling [{SERVICE_NAME}] service");
-    log_expect(
-        std::process::Command::new("systemctl")
-            .arg("disable")
-            .arg(SERVICE_NAME)
-            .arg("--now")
-            .output(),
-        "Failed to disable service.",
-    );
+    std::process::Command::new("systemctl")
+        .arg("disable")
+        .arg(SERVICE_NAME)
+        .arg("--now")
+        .output()
+        .context("Failed to disable service.")?;
 
     // Remove the unit file.
     let unit_file = format!("/etc/systemd/system/{SERVICE_NAME}.service");
@@ -70,17 +67,15 @@ pub fn process() -> Result<()> {
     let unit_file = Path::new(&unit_file);
     if unit_file.exists() {
         log::debug!("Service file exists, removing it");
-        log_expect(remove_file(unit_file), "Failed to remove unit file.");
+        remove_file(unit_file).context("Failed to remove unit file.")?;
     }
     log::debug!("Service file removed");
 
     log::debug!("Reloading systemd daemon");
-    log_expect(
-        std::process::Command::new("systemctl")
-            .arg("daemon-reload")
-            .output(),
-        "Failed to reload systemd daemon.",
-    );
+    std::process::Command::new("systemctl")
+        .arg("daemon-reload")
+        .output()
+        .context("Failed to reload systemd daemon.")?;
 
     log::debug!("Service uninstalled successfully.");
     Ok(())

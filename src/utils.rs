@@ -34,14 +34,3 @@ pub fn parse_args() -> anyhow::Result<(Option<PathBuf>, Option<String>)> {
         anyhow::bail!("missing argument");
     }
 }
-
-#[allow(unused)]
-pub fn log_expect<T, E>(result: Result<T, E>, msg: &str) -> T
-where
-    E: std::fmt::Display,
-{
-    result.unwrap_or_else(|err| {
-        log::error!("{msg}: {err}");
-        panic!("{}", msg);
-    })
-}
