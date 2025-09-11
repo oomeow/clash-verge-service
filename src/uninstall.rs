@@ -8,8 +8,9 @@ pub fn process() -> Result<()> {
 
 #[cfg(target_os = "macos")]
 pub fn process() -> Result<()> {
-    use anyhow::Context;
     use std::{fs::remove_file, path::Path};
+
+    use anyhow::Context;
 
     log::debug!("Start uninstall Clash Verge Service");
 
@@ -24,9 +25,7 @@ pub fn process() -> Result<()> {
         .context("Failed to unload service.")?;
 
     // Remove the service file.
-    log::debug!(
-        "Removing service file [/Library/PrivilegedHelperTools/io.github.clashverge.helper]"
-    );
+    log::debug!("Removing service file [/Library/PrivilegedHelperTools/io.github.clashverge.helper]");
     let service_file = Path::new("/Library/PrivilegedHelperTools/io.github.clashverge.helper");
     if service_file.exists() {
         remove_file(service_file).expect("Failed to remove service file.");
@@ -45,10 +44,11 @@ pub fn process() -> Result<()> {
 
 #[cfg(target_os = "linux")]
 pub fn process() -> Result<()> {
+    use std::{fs::remove_file, path::Path};
+
     use anyhow::Context;
 
     use crate::service::SERVICE_NAME;
-    use std::{fs::remove_file, path::Path};
 
     log::debug!("Start uninstall Clash Verge Service");
 
@@ -85,6 +85,7 @@ pub fn process() -> Result<()> {
 #[cfg(windows)]
 pub fn process() -> Result<()> {
     use std::{thread, time::Duration};
+
     use windows_service::{
         service::{ServiceAccess, ServiceState},
         service_manager::{ServiceManager, ServiceManagerAccess},

@@ -1,6 +1,12 @@
-use super::data::*;
-use crate::log_config::LogConfig;
-use crate::service::logger::Logger;
+use std::{
+    collections::{HashMap, VecDeque},
+    io::{BufRead, BufReader},
+    path::PathBuf,
+    process::{Command, Stdio},
+    sync::Arc,
+    thread::spawn,
+};
+
 use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Local};
 use once_cell::sync::OnceCell;
@@ -8,13 +14,10 @@ use parking_lot::Mutex;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use shared_child::SharedChild;
-use std::collections::{HashMap, VecDeque};
-use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
-use std::process::{Command, Stdio};
-use std::sync::Arc;
-use std::thread::spawn;
 use sysinfo::System;
+
+use super::data::*;
+use crate::{log_config::LogConfig, service::logger::Logger};
 
 /// 默认重新运行的尝试次数
 const DEFAULT_RETRY_COUNT: u8 = 10;
@@ -76,10 +79,7 @@ fn run_core(body: StartBody) -> Result<()> {
     }
 
     let mut command = Command::new(body.bin_path);
-    command
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+    command.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
     let shared_child = SharedChild::spawn(&mut command).context("failed to spawn clash")?;
     let child = Arc::new(shared_child);
     {
@@ -175,9 +175,7 @@ pub fn start_clash(body: StartBody) -> Result<()> {
     let log_dir = log_file_path.parent().unwrap().to_path_buf();
     let log_file_name = log_file_path.file_name().unwrap().to_str().unwrap();
     log::debug!("update log config");
-    LogConfig::global()
-        .lock()
-        .update_config(log_file_name, log_dir, None)?;
+    LogConfig::global().lock().update_config(log_file_name, log_dir, None)?;
 
     log::debug!("run clash core");
     run_core(body)?;
@@ -216,10 +214,7 @@ pub fn get_clash() -> Result<ClashStatus> {
     if clash_status.restart_retry_count == 0 {
         bail!("clash not executed, retry count exceeded!")
     }
-    match (
-        clash_status.info.clone(),
-        clash_status.restart_retry_count == 0,
-    ) {
+    match (clash_status.info.clone(), clash_status.restart_retry_count == 0) {
         (Some(_), false) => Ok(clash_status.clone()),
         (Some(_), true) => bail!("clash terminated, retry count exceeded!"),
         (None, _) => bail!("clash not executed"),

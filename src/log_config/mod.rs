@@ -1,3 +1,5 @@
+use std::{fs, path::PathBuf, sync::Arc};
+
 use anyhow::{Result, bail};
 use log::LevelFilter;
 use log4rs::{
@@ -8,7 +10,6 @@ use log4rs::{
 };
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-use std::{fs, path::PathBuf, sync::Arc};
 
 #[derive(Debug, Clone)]
 pub struct LogConfig {
@@ -49,12 +50,7 @@ impl LogConfig {
         let log_file_name = log_file_name.clone();
         let log_level = log_level.unwrap();
 
-        let config = Self::create_log_config(
-            &log_file_name,
-            log_dir.clone(),
-            limited_file_size,
-            log_level,
-        );
+        let config = Self::create_log_config(&log_file_name, log_dir.clone(), limited_file_size, log_level);
 
         if let Some(config) = config {
             let handle = log4rs::init_config(config).unwrap();

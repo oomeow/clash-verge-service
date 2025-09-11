@@ -4,11 +4,10 @@ mod log_config;
 mod service;
 mod uninstall;
 
-use std::{env::current_exe, path::PathBuf};
-
-use log_config::LogConfig;
+use std::{env::current_dir, path::PathBuf};
 
 use clap::{Parser, Subcommand};
+use log_config::LogConfig;
 #[cfg(windows)]
 use once_cell::sync::OnceCell;
 #[cfg(windows)]
@@ -71,14 +70,7 @@ fn main() -> anyhow::Result<()> {
             crate::uninstall::process()?;
         }
         None => {
-            let current_path = current_exe()?;
-            let log_dir = current_path
-                .as_path()
-                .parent()
-                .ok_or(anyhow::anyhow!("failed to get current dir"))?;
-            LogConfig::global()
-                .lock()
-                .init(Some(PathBuf::from(log_dir)))?;
+            LogConfig::global().lock().init(Some(current_dir()?))?;
             let server_id = cli.server_id;
             log::info!("Server ID: {:?}", server_id);
             #[cfg(not(windows))]

@@ -1,15 +1,15 @@
-use aes_gcm::aead::{Aead, KeyInit, OsRng};
-use aes_gcm::{AeadCore, Aes256Gcm, Nonce};
+use std::{env::current_exe, io::Read, path::PathBuf, str::FromStr};
+
+use aes_gcm::{
+    AeadCore, Aes256Gcm, Nonce,
+    aead::{Aead, KeyInit, OsRng},
+};
 use anyhow::{Ok, Result, anyhow, bail};
-use base64::Engine;
-use base64::prelude::BASE64_STANDARD;
-use rsa::Pkcs1v15Encrypt;
-use rsa::pkcs1::{DecodeRsaPrivateKey, EncodeRsaPrivateKey, EncodeRsaPublicKey};
-use rsa::{RsaPrivateKey, RsaPublicKey, pkcs1::DecodeRsaPublicKey};
-use std::env::current_exe;
-use std::io::Read;
-use std::path::PathBuf;
-use std::str::FromStr;
+use base64::{Engine, prelude::BASE64_STANDARD};
+use rsa::{
+    Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey,
+    pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey},
+};
 
 pub const PRI_KEY_PEM_FILE: &str = ".private.pem";
 pub const PUB_KEY_PEM_FILE: &str = ".public.pem";
@@ -102,6 +102,7 @@ pub fn gen_aes_key_and_nonce() -> (Vec<u8>, Vec<u8>) {
     (key.to_vec(), nonce.to_vec())
 }
 
+/// enscrypt response data
 pub fn encrypt_socket_data(public_key: &RsaPublicKey, data: &str) -> Result<String> {
     let (aes_key, nonce) = gen_aes_key_and_nonce();
     let ciphertext = aes_encrypt(&aes_key, &nonce, data.as_bytes())?;
@@ -117,20 +118,20 @@ pub fn encrypt_socket_data(public_key: &RsaPublicKey, data: &str) -> Result<Stri
     Ok(combined)
 }
 
+/// check if the request data is valid and decrypt it
 pub fn decrypt_socket_data(private_key: &RsaPrivateKey, data: &str) -> Result<String> {
     let parts: Vec<&str> = data.trim().split('|').collect();
     if parts.len() != 3 {
-        bail!("Invalid format");
+        bail!("Invalid data");
     }
 
     let enc_data = BASE64_STANDARD.decode(parts[0])?;
     let nonce = BASE64_STANDARD.decode(parts[1])?;
     let ciphertext = BASE64_STANDARD.decode(parts[2])?;
 
-    let aes_key = rsa_decrypt(private_key, &enc_data)
-        .map_err(|e| anyhow!("decrypt data failed, error: {}", e))?;
-    let plaintext = aes_decrypt(&aes_key, &nonce, &ciphertext)
-        .map_err(|e| anyhow!("decrypt data failed, error: {}", e))?;
+    let aes_key = rsa_decrypt(private_key, &enc_data).map_err(|e| anyhow!("decrypt data failed, error: {}", e))?;
+    let plaintext =
+        aes_decrypt(&aes_key, &nonce, &ciphertext).map_err(|e| anyhow!("decrypt data failed, error: {}", e))?;
     let data = String::from_utf8_lossy(&plaintext);
 
     Ok(data.to_string())

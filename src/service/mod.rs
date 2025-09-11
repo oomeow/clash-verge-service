@@ -1,43 +1,25 @@
 pub mod data;
 mod handle;
 mod logger;
+use anyhow::{Result, anyhow};
+use data::{JsonResponse, SocketCommand};
+use futures_util::StreamExt;
 #[cfg(test)]
 pub use handle::ClashStatus;
-
-use crate::crypto::decrypt_socket_data;
-use crate::crypto::encrypt_socket_data;
-use crate::crypto::generate_rsa_keys;
-use crate::crypto::load_keys;
-
-use data::JsonResponse;
-use data::SocketCommand;
-use futures_util::StreamExt;
-use handle::get_clash;
-use handle::get_logs;
-use handle::get_version;
-use handle::start_clash;
-use handle::stop_clash;
-use rsa::RsaPrivateKey;
-use rsa::RsaPublicKey;
-
-use anyhow::Result;
-use tipsy::Connection;
-use tipsy::Endpoint;
-use tipsy::OnConflict;
-use tipsy::SecurityAttributes;
-use tipsy::ServerId;
-use tokio::io::AsyncBufReadExt;
-use tokio::io::AsyncWriteExt;
-use tokio::io::BufReader;
-use tokio::sync::watch::channel;
+use handle::{get_clash, get_logs, get_version, start_clash, stop_clash};
+use rsa::{RsaPrivateKey, RsaPublicKey};
+use tipsy::{Connection, Endpoint, OnConflict, SecurityAttributes, ServerId};
+use tokio::{
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    sync::watch::{Sender, channel},
+};
 #[cfg(windows)]
 use windows_service::{
-    service::{
-        ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
-        ServiceType,
-    },
+    service::{ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus, ServiceType},
     service_control_handler::{self, ServiceControlHandlerResult},
 };
+
+use crate::crypto::{decrypt_socket_data, encrypt_socket_data, generate_rsa_keys, load_keys};
 
 #[cfg(windows)]
 pub const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
@@ -65,16 +47,13 @@ macro_rules! wrap_response {
 pub async fn run_service(server_id: Option<String>) -> Result<()> {
     // 开启服务 设置服务状态
     #[cfg(windows)]
-    let status_handle = service_control_handler::register(
-        SERVICE_NAME,
-        move |event| -> ServiceControlHandlerResult {
-            match event {
-                ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
-                ServiceControl::Stop => std::process::exit(0),
-                _ => ServiceControlHandlerResult::NotImplemented,
-            }
-        },
-    )?;
+    let status_handle = service_control_handler::register(SERVICE_NAME, move |event| -> ServiceControlHandlerResult {
+        match event {
+            ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
+            ServiceControl::Stop => std::process::exit(0),
+            _ => ServiceControlHandlerResult::NotImplemented,
+        }
+    })?;
     #[cfg(windows)]
     status_handle.set_service_status(ServiceStatus {
         service_type: SERVICE_TYPE,
@@ -99,14 +78,16 @@ pub async fn run_service(server_id: Option<String>) -> Result<()> {
 
     let path = ServerId::new(server_id).parent_folder(std::env::temp_dir());
     let security_attributes = SecurityAttributes::allow_everyone_connect()?;
-    let mut incoming = Endpoint::new(path, OnConflict::Overwrite)?
+    let incoming = Endpoint::new(path, OnConflict::Overwrite)?
         .security_attributes(security_attributes)
         .incoming()?;
+    futures_util::pin_mut!(incoming);
 
     let (shutdown_tx, mut shutdown_rx) = channel(());
-    loop {
-        tokio::select! {
-            Some(result) = incoming.next() => {
+
+    tokio::select! {
+         _ = async {
+            while let Some(result) = incoming.next().await {
                 match result {
                     Ok(stream) => {
                         let reader = BufReader::new(stream);
@@ -115,11 +96,10 @@ pub async fn run_service(server_id: Option<String>) -> Result<()> {
                     _ => unreachable!("ideally")
                 }
             }
-            _ = shutdown_rx.changed() => {
-                let _ = stop_service();
-                log::info!("Shutdown Service");
-                break;
-            }
+        } => { }
+        _ = shutdown_rx.changed() => {
+            let _ = stop_service();
+            log::info!("Shutdown Service");
         }
     }
 
@@ -130,53 +110,60 @@ async fn spawn_read_task(
     private_key: RsaPrivateKey,
     public_key: RsaPublicKey,
     mut reader: BufReader<Connection>,
-    shutdown_tx: tokio::sync::watch::Sender<()>,
+    shutdown_tx: Sender<()>,
 ) {
     tokio::spawn(async move {
-        loop {
-            let mut msg = String::new();
-            match reader.read_line(&mut msg).await {
-                Ok(size) if size > 0 => match decrypt_socket_data(&private_key.clone(), &msg) {
-                    Ok(req_data) => match serde_json::from_str::<SocketCommand>(&req_data) {
-                        Ok(cmd) => {
-                            if handle_socket_command(&public_key.clone(), &mut reader, cmd.clone())
-                                .await
-                                .is_err()
-                            {
-                                log::error!("Error handling socket command");
-                            }
-                            if let SocketCommand::StopService = cmd {
-                                let _ = reader.shutdown().await;
-                                let _ = shutdown_tx.send(());
-                                break;
-                            }
-                        }
-                        Err(err) => {
-                            log::error!("Error parsing socket command: {err}");
-                        }
-                    },
-                    Err(err) => {
+        let res: Result<()> = async {
+            loop {
+                let mut msg = String::new();
+                let size = reader.read_line(&mut msg).await.map_err(|err| {
+                    log::error!("Error reading from socket: {err}");
+                    anyhow!("Error reading from socket: {err}")
+                })?;
+                if size > 0 {
+                    let req_data = decrypt_socket_data(&private_key.clone(), &msg).map_err(|err| {
                         log::error!("Error decrypting socket data: {err}");
-                        let err_res = Result::<()>::Err(err);
-                        let response = wrap_response!(err_res).unwrap();
-                        let combined = encrypt_socket_data(&public_key, &response).unwrap();
-                        reader.write_all(combined.as_bytes()).await.unwrap();
+                        anyhow!("Error decrypting socket data: {err}")
+                    })?;
+
+                    let cmd = serde_json::from_str::<SocketCommand>(&req_data).map_err(|err| {
+                        log::error!("Error parsing socket command: {err}");
+                        anyhow!("Error parsing socket command: {err}")
+                    })?;
+
+                    handle_socket_command(&public_key, &mut reader, cmd.clone())
+                        .await
+                        .map_err(|err| {
+                            log::error!("Error handling socket command: {err}");
+                            anyhow!("Error handling socket command: {err}")
+                        })?;
+                    if let SocketCommand::StopService = cmd {
+                        reader.shutdown().await?;
+                        let _ = shutdown_tx.send(());
+                        break Ok(());
                     }
-                },
-                Ok(_) => {
+                } else {
                     log::debug!("empty line, the socket is closed");
-                    break;
-                }
-                Err(err) => {
-                    log::error!("read error: {err}");
-                    break;
+                    break Ok(());
                 }
             }
         }
+        .await;
+
+        if res.is_err() {
+            log::info!("send error response to back");
+            let response = wrap_response!(res)?;
+            let combined = encrypt_socket_data(&public_key, &response)?;
+            reader.write_all(combined.as_bytes()).await?;
+        }
+
         log::info!("Connection closed");
+
+        Result::<()>::Ok(())
     });
 }
 
+/// handle socket command and write response message
 async fn handle_socket_command(
     public_key: &RsaPublicKey,
     reader: &mut BufReader<Connection>,
@@ -219,8 +206,7 @@ async fn handle_socket_command(
 /// 停止服务
 #[cfg(windows)]
 fn stop_service() -> Result<()> {
-    let status_handle =
-        service_control_handler::register(SERVICE_NAME, |_| ServiceControlHandlerResult::NoError)?;
+    let status_handle = service_control_handler::register(SERVICE_NAME, |_| ServiceControlHandlerResult::NoError)?;
 
     status_handle.set_service_status(ServiceStatus {
         service_type: SERVICE_TYPE,

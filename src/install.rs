@@ -1,6 +1,6 @@
-use crate::service::DEFAULT_SERVER_ID;
-
 use anyhow::Result;
+
+use crate::service::DEFAULT_SERVER_ID;
 
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 pub fn process(_server_id: Option<String>) -> Result<()> {
@@ -10,10 +10,9 @@ pub fn process(_server_id: Option<String>) -> Result<()> {
 
 #[cfg(target_os = "macos")]
 pub fn process(server_id: Option<String>) -> Result<()> {
+    use std::{fs::File, io::Write, path::Path};
+
     use anyhow::Context;
-    use std::fs::File;
-    use std::io::Write;
-    use std::path::Path;
 
     let server_id = server_id.unwrap_or(DEFAULT_SERVER_ID.to_string());
 
@@ -22,9 +21,7 @@ pub fn process(server_id: Option<String>) -> Result<()> {
     // TODO: 手上没有 Mac 电脑，无法验证之前的逻辑是否会覆盖旧的服务，因此暂时使用卸载的方法确保旧的服务卸载已被卸载
     crate::uninstall::process()?;
 
-    let service_binary_path = std::env::current_exe()
-        .unwrap()
-        .with_file_name("clash-verge-service");
+    let service_binary_path = std::env::current_exe().unwrap().with_file_name("clash-verge-service");
     let target_binary_path = "/Library/PrivilegedHelperTools/io.github.clashverge.helper";
     log::debug!("Generate service file at {}", target_binary_path);
     let target_binary_dir = Path::new("/Library/PrivilegedHelperTools");
@@ -33,12 +30,8 @@ pub fn process(server_id: Option<String>) -> Result<()> {
         std::process::exit(2);
     }
     if !target_binary_dir.exists() {
-        log::debug!(
-            "Create directory for service file [{}].",
-            target_binary_dir.display()
-        );
-        std::fs::create_dir(target_binary_dir)
-            .context("Unable to create directory for service file")?;
+        log::debug!("Create directory for service file [{}].", target_binary_dir.display());
+        std::fs::create_dir(target_binary_dir).context("Unable to create directory for service file")?;
     }
 
     log::debug!(
@@ -46,8 +39,7 @@ pub fn process(server_id: Option<String>) -> Result<()> {
         service_binary_path.display(),
         target_binary_path
     );
-    std::fs::copy(service_binary_path, target_binary_path)
-        .context("Unable to copy service file")?;
+    std::fs::copy(service_binary_path, target_binary_path).context("Unable to copy service file")?;
 
     let plist_file = "/Library/LaunchDaemons/io.github.clashverge.helper.plist";
     log::debug!("Create plist file at {}", plist_file);
@@ -115,18 +107,17 @@ pub fn process(server_id: Option<String>) -> Result<()> {
 
 #[cfg(target_os = "linux")]
 pub fn process(server_id: Option<String>) -> Result<()> {
-    use crate::service::SERVICE_NAME;
+    use std::{fs::File, io::Write, path::Path};
+
     use anyhow::Context;
-    use std::path::Path;
-    use std::{fs::File, io::Write};
+
+    use crate::service::SERVICE_NAME;
 
     let server_id = server_id.unwrap_or(DEFAULT_SERVER_ID.to_string());
 
     log::debug!("Start install Clash Verge Service.");
 
-    let service_binary_path = std::env::current_exe()
-        .unwrap()
-        .with_file_name("clash-verge-service");
+    let service_binary_path = std::env::current_exe().unwrap().with_file_name("clash-verge-service");
     if !service_binary_path.exists() {
         log::error!("The clash-verge-service binary not found.");
         std::process::exit(2);
@@ -201,11 +192,9 @@ pub fn process(server_id: Option<String>) -> Result<()> {
 #[cfg(windows)]
 pub fn process(server_id: Option<String>) -> Result<()> {
     use std::ffi::{OsStr, OsString};
+
     use windows_service::{
-        service::{
-            ServiceAccess, ServiceErrorControl, ServiceInfo, ServiceStartType, ServiceState,
-            ServiceType,
-        },
+        service::{ServiceAccess, ServiceErrorControl, ServiceInfo, ServiceStartType, ServiceState, ServiceType},
         service_manager::{ServiceManager, ServiceManagerAccess},
     };
 
