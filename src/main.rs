@@ -4,7 +4,7 @@ mod log_config;
 mod service;
 mod uninstall;
 
-use std::{env::current_dir, path::PathBuf};
+use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use log_config::LogConfig;
@@ -16,7 +16,7 @@ use windows_service::{define_windows_service, service_dispatcher};
 #[derive(Parser)]
 #[command(version, about = "install, uninstall or run Clash Verge Service", long_about = None)]
 struct Cli {
-    #[arg(short, long, help = "run service by using this server id for IPC")]
+    #[arg(short, long, help = "Run the IPC server with server-id as the socket path")]
     server_id: Option<String>,
 
     #[command(subcommand)]
@@ -25,17 +25,17 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    #[command(about = "install Clash Verge Service")]
+    #[command(about = "Install Clash Verge Service")]
     Install {
-        #[arg(short, long, help = "log directory")]
+        #[arg(short, long, help = "Log directory")]
         log_dir: Option<PathBuf>,
 
-        #[arg(short, long, help = "server id of IPC")]
+        #[arg(short, long, help = "The socket path of the IPC server")]
         server_id: Option<String>,
     },
-    #[command(about = "uninstall Clash Verge Service")]
+    #[command(about = "Uninstall Clash Verge Service")]
     Uninstall {
-        #[arg(short, long, help = "log directory")]
+        #[arg(short, long, help = "Log directory")]
         log_dir: Option<PathBuf>,
     },
 }
@@ -70,7 +70,7 @@ fn main() -> anyhow::Result<()> {
             crate::uninstall::process()?;
         }
         None => {
-            LogConfig::global().lock().init(Some(current_dir()?))?;
+            LogConfig::global().lock().init(None)?;
             let server_id = cli.server_id;
             log::info!("Server ID: {:?}", server_id);
             #[cfg(not(windows))]
