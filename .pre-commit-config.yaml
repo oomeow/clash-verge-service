@@ -10,7 +10,7 @@ repos: # this will check typos and fix file automatically, but need to re-add fi
       - id: cargo-fmt
         name: cargo fmt
         description: Format files with rustfmt.
-        entry: cargo fmt -- --check
+        entry: cargo +nightly fmt -- --check
         language: system
         types:
           - rust

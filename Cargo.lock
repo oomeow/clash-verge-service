@@ -270,7 +270,6 @@ dependencies = [
  "chrono",
  "clap",
  "futures",
- "futures-util",
  "hkdf",
  "log",
  "log4rs",

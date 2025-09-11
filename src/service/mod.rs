@@ -10,12 +10,15 @@ use std::{
 
 use anyhow::{Result, anyhow};
 use bytes::{BufMut, BytesMut};
-use chacha20poly1305::XChaCha20Poly1305;
-use chacha20poly1305::aead::rand_core::{self, RngCore};
-use chacha20poly1305::aead::{Aead, KeyInit, OsRng};
+use chacha20poly1305::{
+    XChaCha20Poly1305,
+    aead::{
+        Aead, KeyInit, OsRng,
+        rand_core::{self, RngCore},
+    },
+};
 use data::{JsonResponse, SocketCommand};
-use futures::SinkExt;
-use futures_util::StreamExt;
+use futures::{SinkExt, StreamExt};
 pub use handle::ClashStatus;
 use handle::{get_clash, get_logs, get_version, start_clash, stop_clash};
 use hkdf::Hkdf;
@@ -159,7 +162,7 @@ pub async fn run_service(server_id: Option<String>, psk: Option<&[u8]>) -> Resul
     let incoming = Endpoint::new(path, OnConflict::Overwrite)?
         .security_attributes(security_attributes)
         .incoming()?;
-    futures_util::pin_mut!(incoming);
+    futures::pin_mut!(incoming);
 
     let (shutdown_tx, mut shutdown_rx) = channel(());
 
