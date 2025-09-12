@@ -47,7 +47,8 @@ pub fn my_service_main(_arguments: Vec<std::ffi::OsString>) {
     if let Ok(rt) = tokio::runtime::Runtime::new() {
         let server_id = SERVER_ID.get().expect("failed to get server id").clone();
         rt.block_on(async move {
-            let _ = crate::service::run_service(server_id).await;
+            let psk = b"asdoekxfsdedadxjasd";
+            let _ = clash_verge_service::service::run_service(server_id, Some(psk)).await;
         });
     }
 }

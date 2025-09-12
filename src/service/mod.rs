@@ -23,7 +23,7 @@ pub use handle::ClashStatus;
 use handle::{get_clash, get_logs, get_version, start_clash, stop_clash};
 use hkdf::Hkdf;
 use parking_lot::Mutex;
-use tipsy::{Connection, Endpoint, OnConflict, SecurityAttributes, ServerId};
+use tipsy::{Connection, Endpoint, IntoIpcPath, OnConflict, SecurityAttributes, ServerId};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::watch::{Sender, channel},
@@ -135,6 +135,7 @@ where
 
 /// The Service
 pub async fn run_service(server_id: Option<String>, psk: Option<&[u8]>) -> Result<()> {
+    // NOTE: comment follow windows code for debug
     // 开启服务 设置服务状态
     #[cfg(windows)]
     let status_handle = service_control_handler::register(SERVICE_NAME, move |event| -> ServiceControlHandlerResult {
@@ -158,6 +159,7 @@ pub async fn run_service(server_id: Option<String>, psk: Option<&[u8]>) -> Resul
     let server_id = server_id.unwrap_or(DEFAULT_SERVER_ID.to_string());
 
     let path = ServerId::new(server_id).parent_folder(std::env::temp_dir());
+    println!("socket path: {}", path.clone().into_ipc_path()?.display());
     let security_attributes = SecurityAttributes::allow_everyone_connect()?;
     let incoming = Endpoint::new(path, OnConflict::Overwrite)?
         .security_attributes(security_attributes)
@@ -174,12 +176,13 @@ pub async fn run_service(server_id: Option<String>, psk: Option<&[u8]>) -> Resul
                         println!("handshake server");
                         let mut secured = SecureChannel::handshake_server(stream, psk).await?;
                         println!("receive request message");
-                        if let Ok(msg) = secured.recv().await {
-                            println!("server got: {}", String::from_utf8_lossy(&msg));
-                            let msg = String::from_utf8_lossy(&msg).to_string();
-                            spawn_read_task(msg, secured, shutdown_tx.clone()).await;
-                        } else {
-                            println!("ca")
+                        match secured.recv().await {
+                            Ok(msg) => {
+                                println!("server got: {}", String::from_utf8_lossy(&msg));
+                                let msg = String::from_utf8_lossy(&msg).to_string();
+                                spawn_read_task(msg, secured, shutdown_tx.clone()).await;
+                            }
+                            Err(err) => println!("server receive failed, error: {err}")
                         }
                     }
                     _ => unreachable!("ideally")
