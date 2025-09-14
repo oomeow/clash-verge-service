@@ -25,7 +25,7 @@ jobs:
       - name: Generate Changelog
         id: generate
         run: |
-          pre_version=$(git tag --sort=-creatordate | grep -Ev "alpha" | sed -n 1p)
+          pre_version=$(git tag --sort=-creatordate | grep -Ev "(alpha|${{ github.ref_name }})" | sed -n 1p)
           npx changelogithub --from ${pre_version} --to ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
