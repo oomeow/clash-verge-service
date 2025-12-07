@@ -9,7 +9,7 @@ async fn main() -> anyhow::Result<()> {
 
     let psk = b"asdoekxfsdedadxjasd";
     let mut secured = clash_verge_service::service::SecureChannel::handshake_client(client, Some(psk)).await?;
-    for _ in 0..=20 {
+    for _ in 0..=2000 {
         let plaintext = serde_json::to_string(&clash_verge_service::service::data::SocketCommand::GetVersion)?;
         secured.send(plaintext.as_bytes()).await?;
         let response = secured.recv().await?;

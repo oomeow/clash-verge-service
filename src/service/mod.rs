@@ -60,18 +60,15 @@ macro_rules! wrap_response {
     };
 }
 
-pub struct SecureChannel<S> {
-    inner: Framed<S, LengthDelimitedCodec>,
+pub struct SecureChannel {
+    inner: Framed<Connection, LengthDelimitedCodec>,
     aead: Arc<XChaCha20Poly1305>,
     // 该 IPC 服务不存在大量并发，所以使用 Arc<Mutex<HashSet<u64>>> 已经够用了
     seen_ids: Arc<Mutex<HashSet<u64>>>,
     timestamp_window: u64,
 }
 
-impl<S> SecureChannel<S>
-where
-    S: AsyncReadExt + AsyncWriteExt + Unpin + Send + 'static,
-{
+impl SecureChannel {
     pub async fn send(&mut self, plaintext: &[u8]) -> Result<()> {
         let mut buf = BytesMut::new();
 
@@ -96,6 +93,7 @@ where
         let mut frame = BytesMut::new();
         frame.put_slice(&nonce);
         frame.put_slice(&cipher);
+
         self.inner.send(frame.freeze()).await?;
         Ok(())
     }
@@ -178,7 +176,6 @@ pub async fn run_service(server_id: Option<String>, psk: Option<&[u8]>) -> Resul
                         println!("receive request message");
                         match secured.recv().await {
                             Ok(msg) => {
-                                println!("server got: {}", String::from_utf8_lossy(&msg));
                                 let msg = String::from_utf8_lossy(&msg).to_string();
                                 spawn_read_task(msg, secured, shutdown_tx.clone()).await;
                             }
@@ -199,8 +196,8 @@ pub async fn run_service(server_id: Option<String>, psk: Option<&[u8]>) -> Resul
     Ok(())
 }
 
-impl SecureChannel<Connection> {
-    pub async fn handshake_server(mut stream: Connection, psk: Option<&[u8]>) -> Result<SecureChannel<Connection>> {
+impl SecureChannel {
+    pub async fn handshake_server(mut stream: Connection, psk: Option<&[u8]>) -> Result<SecureChannel> {
         let server_secret = StaticSecret::random_from_rng(rand_core::OsRng);
         let server_pub = PublicKey::from(&server_secret);
 
@@ -230,7 +227,7 @@ impl SecureChannel<Connection> {
         })
     }
 
-    pub async fn handshake_client(mut stream: Connection, psk: Option<&[u8]>) -> Result<SecureChannel<Connection>> {
+    pub async fn handshake_client(mut stream: Connection, psk: Option<&[u8]>) -> Result<SecureChannel> {
         let client_secret = StaticSecret::random_from_rng(rand_core::OsRng);
         let client_pub = PublicKey::from(&client_secret);
 
@@ -261,7 +258,7 @@ impl SecureChannel<Connection> {
     }
 }
 
-async fn spawn_read_task(req_data: String, mut secured: SecureChannel<Connection>, shutdown_tx: Sender<()>) {
+async fn spawn_read_task(req_data: String, mut secured: SecureChannel, shutdown_tx: Sender<()>) {
     tokio::spawn(async move {
         let res: Result<()> = async {
             loop {
@@ -269,6 +266,7 @@ async fn spawn_read_task(req_data: String, mut secured: SecureChannel<Connection
                     log::error!("Error parsing socket command: {err}");
                     anyhow!("Error parsing socket command: {err}")
                 })?;
+                println!("server got command: {:?}", cmd);
 
                 handle_socket_command(&mut secured, cmd.clone()).await.map_err(|err| {
                     log::error!("Error handling socket command: {err}");
@@ -296,7 +294,7 @@ async fn spawn_read_task(req_data: String, mut secured: SecureChannel<Connection
 }
 
 /// handle socket command and write response message
-async fn handle_socket_command(secured: &mut SecureChannel<Connection>, cmd: SocketCommand) -> Result<()> {
+async fn handle_socket_command(secured: &mut SecureChannel, cmd: SocketCommand) -> Result<()> {
     log::info!("Handling socket command: {cmd:?}");
     let response = match cmd {
         SocketCommand::GetVersion => wrap_response!(get_version())?,
