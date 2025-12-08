@@ -47,8 +47,7 @@ pub fn process() -> Result<()> {
     use std::{fs::remove_file, path::Path};
 
     use anyhow::Context;
-
-    use crate::service::SERVICE_NAME;
+    use clash_verge_self_service::service::SERVICE_NAME;
 
     log::debug!("Start uninstall Clash Verge Self Service");
 
