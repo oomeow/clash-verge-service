@@ -3,10 +3,10 @@
 <plist version="1.0">
     <dict>
         <key>Label</key>
-        <string>io.github.clashverge.helper</string>
+        <string>io.github.clashvergeself.helper</string>
         <key>MachServices</key>
         <dict>
-            <key>io.github.clashverge.helper</key>
+            <key>io.github.clashvergeself.helper</key>
             <true />
         </dict>
         <key>RunAtLoad</key>
@@ -14,10 +14,10 @@
         <key>KeepAlive</key>
         <true/>
         <key>Program</key>
-        <string>/Library/PrivilegedHelperTools/io.github.clashverge.helper</string>
+        <string>/Library/PrivilegedHelperTools/io.github.clashvergeself.helper</string>
         <key>ProgramArguments</key>
         <array>
-            <string>/Library/PrivilegedHelperTools/io.github.clashverge.helper</string>
+            <string>/Library/PrivilegedHelperTools/io.github.clashvergeself.helper</string>
             <string>--server-id</string>
             <string>{}</string>
         </array>

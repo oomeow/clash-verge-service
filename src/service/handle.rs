@@ -59,7 +59,7 @@ pub fn get_version() -> Result<HashMap<String, String>> {
     let version = env!("CARGO_PKG_VERSION");
 
     let mut map = HashMap::new();
-    map.insert("service".into(), "Clash Verge Service".into());
+    map.insert("service".into(), "Clash Verge Self Service".into());
     map.insert("version".into(), version.into());
 
     Ok(map)

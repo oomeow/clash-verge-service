@@ -12,9 +12,9 @@ pub fn process() -> Result<()> {
 
     use anyhow::Context;
 
-    log::debug!("Start uninstall Clash Verge Service");
+    log::debug!("Start uninstall Clash Verge Self Service");
 
-    let plist_file = "/Library/LaunchDaemons/io.github.clashverge.helper.plist";
+    let plist_file = "/Library/LaunchDaemons/io.github.clashvergeself.helper.plist";
 
     // Unload the service.
     log::debug!("Unloading service");
@@ -25,8 +25,8 @@ pub fn process() -> Result<()> {
         .context("Failed to unload service.")?;
 
     // Remove the service file.
-    log::debug!("Removing service file [/Library/PrivilegedHelperTools/io.github.clashverge.helper]");
-    let service_file = Path::new("/Library/PrivilegedHelperTools/io.github.clashverge.helper");
+    log::debug!("Removing service file [/Library/PrivilegedHelperTools/io.github.clashvergeself.helper]");
+    let service_file = Path::new("/Library/PrivilegedHelperTools/io.github.clashvergeself.helper");
     if service_file.exists() {
         remove_file(service_file).expect("Failed to remove service file.");
     }
@@ -50,7 +50,7 @@ pub fn process() -> Result<()> {
 
     use crate::service::SERVICE_NAME;
 
-    log::debug!("Start uninstall Clash Verge Service");
+    log::debug!("Start uninstall Clash Verge Self Service");
 
     // Disable the service
     log::debug!("Disabling [{SERVICE_NAME}] service");
@@ -91,7 +91,7 @@ pub fn process() -> Result<()> {
         service_manager::{ServiceManager, ServiceManagerAccess},
     };
 
-    log::debug!("Start uninstall Clash Verge Service.");
+    log::debug!("Start uninstall Clash Verge Self Service.");
 
     log::debug!("Connecting to service manager.");
     let manager_access = ServiceManagerAccess::CONNECT;
@@ -99,7 +99,7 @@ pub fn process() -> Result<()> {
 
     log::debug!("Opening existing service.");
     let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE;
-    let service = service_manager.open_service("clash_verge_service", service_access)?;
+    let service = service_manager.open_service("clash_verge_self_service", service_access)?;
 
     log::debug!("Checking service status.");
     let service_status = service.query_status()?;
