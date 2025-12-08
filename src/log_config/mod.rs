@@ -23,7 +23,7 @@ pub struct LogConfig {
 impl Default for LogConfig {
     fn default() -> Self {
         Self {
-            log_file_name: "clash-verge-service.log".to_string(),
+            log_file_name: "clash-verge-self-service.log".to_string(),
             log_dir: None,
             limited_file_size: Some(2 * 1024 * 1024),
             log_level: Some(LevelFilter::Debug),
@@ -85,7 +85,7 @@ impl LogConfig {
         if log_file_name != c_log_file_name {
             need_update = true;
         }
-        if !need_update && (c_log_dir.is_none() || log_dir != c_log_dir.clone().unwrap()) {
+        if !need_update && (c_log_dir.is_none() || log_dir != c_log_dir.unwrap()) {
             need_update = true;
         }
         if !need_update && limited_file_size != c_limited_file_size {
@@ -101,7 +101,7 @@ impl LogConfig {
             log_file_name,
             Some(log_dir.clone()),
             limited_file_size,
-            c_log_level.unwrap(),
+            c_log_level.unwrap_or(LevelFilter::Info),
         );
         if let Some(config) = config {
             c_log_handle.unwrap().set_config(config);
@@ -131,15 +131,12 @@ impl LogConfig {
             if let Some(limited_size) = limited_size
                 && log_file.exists()
             {
-                let metadata = fs::metadata(log_file.clone()).unwrap();
+                let metadata = fs::metadata(log_file.clone()).ok()?;
                 if metadata.len() >= limited_size {
                     let _ = fs::rename(log_file.clone(), log_file.with_extension("old.log"));
                 }
             }
-            let tofile = FileAppender::builder()
-                .encoder(encoder.clone())
-                .build(log_file)
-                .unwrap();
+            let tofile = FileAppender::builder().encoder(encoder.clone()).build(log_file).ok()?;
             let file_appender = Appender::builder().build("file", Box::new(tofile));
             appenders.push(file_appender);
         }

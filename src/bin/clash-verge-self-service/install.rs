@@ -1,6 +1,5 @@
 use anyhow::Result;
-
-use crate::service::DEFAULT_SERVER_ID;
+use clash_verge_self_service::service::DEFAULT_SERVER_ID;
 
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 pub fn process(_server_id: Option<String>) -> Result<()> {
@@ -16,17 +15,19 @@ pub fn process(server_id: Option<String>) -> Result<()> {
 
     let server_id = server_id.unwrap_or(DEFAULT_SERVER_ID.to_string());
 
-    log::debug!("Start install Clash Verge Service.");
+    log::debug!("Start install Clash Verge Self Service.");
 
-    // TODO: 手上没有 Mac 电脑，无法验证之前的逻辑是否会覆盖旧的服务，因此暂时使用卸载的方法确保旧的服务卸载已被卸载
+    // uninstall old service
     crate::uninstall::process()?;
 
-    let service_binary_path = std::env::current_exe().unwrap().with_file_name("clash-verge-service");
-    let target_binary_path = "/Library/PrivilegedHelperTools/io.github.clashverge.helper";
+    let service_binary_path = std::env::current_exe()
+        .unwrap()
+        .with_file_name("clash-verge-self-service");
+    let target_binary_path = "/Library/PrivilegedHelperTools/io.github.clashvergeself.helper";
     log::debug!("Generate service file at {}", target_binary_path);
     let target_binary_dir = Path::new("/Library/PrivilegedHelperTools");
     if !service_binary_path.exists() {
-        log::error!("The clash-verge-service binary not found.");
+        log::error!("The clash-verge-self-service binary not found.");
         std::process::exit(2);
     }
     if !target_binary_dir.exists() {
@@ -41,10 +42,13 @@ pub fn process(server_id: Option<String>) -> Result<()> {
     );
     std::fs::copy(service_binary_path, target_binary_path).context("Unable to copy service file")?;
 
-    let plist_file = "/Library/LaunchDaemons/io.github.clashverge.helper.plist";
+    let plist_file = "/Library/LaunchDaemons/io.github.clashvergeself.helper.plist";
     log::debug!("Create plist file at {}", plist_file);
     let plist_file = Path::new(plist_file);
-    let plist_file_content = format!(include_str!("io.github.clashverge.helper.plist"), server_id);
+    let plist_file_content = format!(
+        include_str!("../../../tmpl/io.github.clashvergeself.helper.plist"),
+        server_id
+    );
     let mut file = File::create(plist_file).context("Failed to create file for writing.")?;
     log::debug!("Create plist file done.");
 
@@ -97,7 +101,7 @@ pub fn process(server_id: Option<String>) -> Result<()> {
     log::debug!("Start service.");
     std::process::Command::new("launchctl")
         .arg("start")
-        .arg("io.github.clashverge.helper")
+        .arg("io.github.clashvergeself.helper")
         .output()
         .context("Failed to load service.")?;
 
@@ -115,11 +119,13 @@ pub fn process(server_id: Option<String>) -> Result<()> {
 
     let server_id = server_id.unwrap_or(DEFAULT_SERVER_ID.to_string());
 
-    log::debug!("Start install Clash Verge Service.");
+    log::debug!("Start install Clash Verge Self Service.");
 
-    let service_binary_path = std::env::current_exe().unwrap().with_file_name("clash-verge-service");
+    let service_binary_path = std::env::current_exe()
+        .unwrap()
+        .with_file_name("clash-verge-self-service");
     if !service_binary_path.exists() {
-        log::error!("The clash-verge-service binary not found.");
+        log::error!("The clash-verge-self-service binary not found.");
         std::process::exit(2);
     }
 
@@ -162,7 +168,7 @@ pub fn process(server_id: Option<String>) -> Result<()> {
     log::debug!("Generating service file [{unit_file}].");
     let unit_file = Path::new(&unit_file);
     let unit_file_content = format!(
-        include_str!("systemd_service_unit.tmpl"),
+        include_str!("../../../tmpl/systemd_service_unit.tmpl"),
         service_binary_path.to_str().unwrap(),
         server_id
     );
@@ -200,7 +206,7 @@ pub fn process(server_id: Option<String>) -> Result<()> {
 
     let server_id = server_id.unwrap_or(DEFAULT_SERVER_ID.to_string());
 
-    log::debug!("Start installing Clash Verge Service.");
+    log::debug!("Start installing Clash Verge Self Service.");
 
     log::debug!("Connecting to the service manager.");
     let manager_access = ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE;
@@ -208,7 +214,7 @@ pub fn process(server_id: Option<String>) -> Result<()> {
 
     log::debug!("Checking if the service is installed and active，delete it if exists");
     let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE;
-    if let Ok(service) = service_manager.open_service("clash_verge_service", service_access) {
+    if let Ok(service) = service_manager.open_service("clash_verge_self_service", service_access) {
         log::debug!("The service is installed, stop and delete it first");
         if let Ok(status) = service.query_status() {
             if status.current_state != ServiceState::Stopped {
@@ -227,16 +233,16 @@ pub fn process(server_id: Option<String>) -> Result<()> {
 
     let service_binary_path = std::env::current_exe()
         .unwrap()
-        .with_file_name("clash-verge-service.exe");
+        .with_file_name("clash-verge-self-service.exe");
 
     if !service_binary_path.exists() {
-        log::error!("clash-verge-service.exe not found");
+        log::error!("clash-verge-self-service.exe not found");
         std::process::exit(2);
     }
 
     let service_info = ServiceInfo {
-        name: OsString::from("clash_verge_service"),
-        display_name: OsString::from("Clash Verge Service"),
+        name: OsString::from("clash_verge_self_service"),
+        display_name: OsString::from("Clash Verge Self Service"),
         service_type: ServiceType::OWN_PROCESS,
         start_type: ServiceStartType::AutoStart,
         error_control: ServiceErrorControl::Normal,
@@ -252,7 +258,7 @@ pub fn process(server_id: Option<String>) -> Result<()> {
     let service = service_manager.create_service(&service_info, start_access)?;
 
     log::debug!("Setting service description.");
-    service.set_description("Clash Verge Service helps to launch clash core")?;
+    service.set_description("Clash Verge Self Service helps to launch clash core")?;
     log::debug!("Starting service.");
     service.start(&Vec::<&OsStr>::new())?;
 

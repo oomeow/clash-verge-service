@@ -6,13 +6,13 @@ Supports multiple platforms Service.
 
 ```shell
 # 安装服务, `--server-id` 是指定 IPC 服务的 ID
-clash-verge-service install [--log-dir 记录日志的目录] --server-id server-test
+clash-verge--self-service install [--log-dir 记录日志的目录] --server-id server-test
 
 # 卸载服务
-clash-verge-service uninstall [--log-dir 记录日志的目录]
+clash-verge-self-service uninstall [--log-dir 记录日志的目录]
 
 # 直接运行 IPC 服务
-clash-verge-service --server-id server-test
+clash-verge-self-service --server-id server-test
 ```
 
 ### 测试 IPC 服务 API 接口
