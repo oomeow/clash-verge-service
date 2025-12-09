@@ -169,7 +169,7 @@ pub async fn run_service(server_id: Option<String>, psk: Option<&[u8]>) -> Resul
     })?;
     #[cfg(windows)]
     status_handle.set_service_status(ServiceStatus {
-        service_type: SERVICE_TYPE,
+        service_type: crate::SERVICE_TYPE,
         current_state: ServiceState::Running,
         controls_accepted: ServiceControlAccept::STOP,
         exit_code: ServiceExitCode::Win32(0),
