@@ -40,6 +40,8 @@ enum Commands {
 /// used to store the server_id resolved by the clap
 #[cfg(windows)]
 static SERVER_ID: OnceCell<Option<String>> = OnceCell::new();
+#[cfg(windows)]
+static SERVER_PSK: OnceCell<Option<Vec<u8>>> = OnceCell::new();
 
 #[cfg(windows)]
 define_windows_service!(ffi_service_main, my_service_main);
@@ -49,10 +51,9 @@ pub fn my_service_main(_arguments: Vec<std::ffi::OsString>) {
     // this arguments is not same as launch arguments
     if let Ok(rt) = tokio::runtime::Runtime::new() {
         let server_id = SERVER_ID.get().expect("failed to get server id").clone();
+        let server_id = server_id.unwrap_or(clash_verge_self_service::DEFAULT_SERVER_ID.to_string());
         rt.block_on(async move {
-            let _ =
-                clash_verge_self_service::service::run_service(server_id, Some(clash_verge_self_service::service::PSK))
-                    .await;
+            let _ = clash_verge_self_service::Server::run(server_id, Some(clash_verge_self_service::PSK)).await;
         });
     }
 }
@@ -69,17 +70,16 @@ fn main() -> anyhow::Result<()> {
             uninstall::process()?;
         }
         None => {
-            let log_dir = PathBuf::from("/Users/oomeow");
-            LogConfig::global().lock().init(Some(log_dir))?;
+            LogConfig::global().lock().init(None)?;
             let server_id = cli.server_id;
             log::info!("Server ID: {:?}", server_id);
-            #[cfg(not(windows))]
+            #[cfg(unix)]
             {
                 let rt = tokio::runtime::Runtime::new()?;
                 rt.block_on(async move {
-                    let _ = clash_verge_self_service::service::run_service(
-                        server_id,
-                        Some(clash_verge_self_service::service::PSK),
+                    let _ = clash_verge_self_service::Server::run(
+                        server_id.unwrap_or(clash_verge_self_service::DEFAULT_SERVER_ID.to_string()),
+                        Some(clash_verge_self_service::PSK),
                     )
                     .await;
                 });
@@ -87,7 +87,7 @@ fn main() -> anyhow::Result<()> {
             #[cfg(windows)]
             {
                 SERVER_ID.set(server_id).expect("failed to set server id");
-                service_dispatcher::start(clash_verge_self_service::service::SERVICE_NAME, ffi_service_main)?;
+                service_dispatcher::start(clash_verge_self_service::SERVICE_NAME, ffi_service_main)?;
             }
         }
     }

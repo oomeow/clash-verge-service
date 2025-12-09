@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::VecDeque,
     io::{BufRead, BufReader},
     path::PathBuf,
     process::{Command, Stdio},
@@ -55,14 +55,12 @@ impl ClashStatus {
 }
 
 /// 获取服务进程的版本
-pub fn get_version() -> Result<HashMap<String, String>> {
+pub fn get_version() -> Result<ServiceVersionInfo> {
     let version = env!("CARGO_PKG_VERSION");
-
-    let mut map = HashMap::new();
-    map.insert("service".into(), "Clash Verge Self Service".into());
-    map.insert("version".into(), version.into());
-
-    Ok(map)
+    Ok(ServiceVersionInfo {
+        version: version.into(),
+        service: "Clash Verge Self Service".into(),
+    })
 }
 
 fn run_core(body: StartBody) -> Result<()> {

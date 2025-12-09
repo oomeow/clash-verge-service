@@ -1,4 +1,6 @@
-use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum SocketCommand {
@@ -8,6 +10,12 @@ pub enum SocketCommand {
     StartClash(StartBody),
     StopClash,
     StopService,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ServiceVersionInfo {
+    pub version: String,
+    pub service: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -27,9 +35,19 @@ pub struct StartBody {
 //     // pub mihomo_level: String,
 // }
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct JsonResponse<T: Serialize> {
+#[derive(Serialize, Deserialize, Debug)]
+pub struct JsonResponse<T> {
     pub code: u64,
     pub msg: String,
     pub data: Option<T>,
+}
+
+impl<T> FromStr for JsonResponse<T>
+where
+    T: DeserializeOwned,
+{
+    type Err = serde_json::error::Error;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        serde_json::from_str(s)
+    }
 }

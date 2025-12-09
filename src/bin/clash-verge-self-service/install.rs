@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clash_verge_self_service::service::DEFAULT_SERVER_ID;
+use clash_verge_self_service::DEFAULT_SERVER_ID;
 
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 pub fn process(_server_id: Option<String>) -> Result<()> {

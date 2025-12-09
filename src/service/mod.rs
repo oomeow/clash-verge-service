@@ -36,13 +36,7 @@ use windows_service::{
 };
 use x25519_dalek::{PublicKey, StaticSecret};
 
-#[cfg(windows)]
-pub const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
-pub const SERVICE_NAME: &str = "clash_verge_self_service";
-pub const DEFAULT_SERVER_ID: &str = "verge-self-service-server";
-
-const KEY_INFO: &[u8] = b"rust-secure-ipc-demo";
-pub const PSK: &[u8] = b"verge-self-service-psk";
+use crate::{DEFAULT_SERVER_ID, KEY_INFO, SERVICE_NAME};
 
 macro_rules! wrap_response {
     ($expr: expr) => {
@@ -220,6 +214,10 @@ pub async fn run_service(server_id: Option<String>, psk: Option<&[u8]>) -> Resul
             let _ = stop_service();
             log::info!("Shutdown Service");
         }
+        _ = tokio::signal::ctrl_c() => {
+            let _ = stop_service();
+            log::info!("Shutdown Service by Ctrl+C");
+        }
     }
 
     Ok(())
@@ -361,6 +359,7 @@ async fn handle_socket_command(secured: &mut SecureChannel, cmd: SocketCommand) 
 #[cfg(windows)]
 fn stop_service() -> Result<()> {
     let status_handle = service_control_handler::register(SERVICE_NAME, |_| ServiceControlHandlerResult::NoError)?;
+    use crate::SERVICE_TYPE;
 
     status_handle.set_service_status(ServiceStatus {
         service_type: SERVICE_TYPE,
@@ -377,6 +376,7 @@ fn stop_service() -> Result<()> {
 #[cfg(not(windows))]
 fn stop_service() -> Result<()> {
     // systemctl stop clash_verge_service
+
     std::process::Command::new("systemctl")
         .arg("stop")
         .arg(SERVICE_NAME)
