@@ -11,6 +11,9 @@ pub mod model {
     pub use super::service::{ClashStatus, data::*};
 }
 
+#[cfg(windows)]
+use windows_service::service::ServiceType;
+
 use crate::service::SecureChannel;
 
 #[cfg(windows)]

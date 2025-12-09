@@ -31,7 +31,7 @@ use tokio::{
 };
 #[cfg(windows)]
 use windows_service::{
-    service::{ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus, ServiceType},
+    service::{ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus},
     service_control_handler::{self, ServiceControlHandlerResult},
 };
 use x25519_dalek::{PublicKey, StaticSecret};

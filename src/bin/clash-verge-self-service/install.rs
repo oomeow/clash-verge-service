@@ -114,7 +114,7 @@ pub fn process(server_id: Option<String>) -> Result<()> {
     use std::{fs::File, io::Write, path::Path};
 
     use anyhow::Context;
-    use clash_verge_self_service::service::SERVICE_NAME;
+    use clash_verge_self_service::SERVICE_NAME;
 
     let server_id = server_id.unwrap_or(DEFAULT_SERVER_ID.to_string());
 
