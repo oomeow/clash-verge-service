@@ -1,4 +1,6 @@
 name: "Build for Linux"
+description: "Build for Linux"
+
 branding:
   icon: user-check
   color: gray-dark
