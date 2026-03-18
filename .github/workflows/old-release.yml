@@ -31,7 +31,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Install Rust
         if: matrix.os != 'ubuntu-latest'
@@ -52,7 +52,7 @@ jobs:
           target: ${{ matrix.target }}
 
       - name: Update Tag
-        uses: richardsimko/update-tag@v1
+        uses: richardsimko/update-tag@aab2434e9a5040687874aa39d1c6377ec0cb0d94 # v1
         with:
           tag_name: ${{ matrix.target }}
         env:
@@ -75,7 +75,7 @@ jobs:
 
       - name: Release
         if: matrix.os == 'windows-latest'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
         with:
           name: ${{ matrix.target }}
           tag_name: ${{ matrix.target }}
@@ -87,7 +87,7 @@ jobs:
 
       - name: Release
         if: matrix.os != 'windows-latest'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
         with:
           name: ${{ matrix.target }}
           tag_name: ${{ matrix.target }}
