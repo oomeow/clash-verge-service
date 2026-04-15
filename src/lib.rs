@@ -8,7 +8,7 @@ use serde::de::DeserializeOwned;
 use tipsy::ServerId;
 
 pub mod model {
-    pub use super::service::{ClashStatus, data::*};
+    pub use super::service::{ClashRunInfo, data::*};
 }
 
 #[cfg(windows)]
@@ -29,7 +29,6 @@ pub const PSK: &[u8] = b"verge-self-service-psk";
 
 pub struct Client(SecureChannel);
 
-#[allow(dead_code)]
 impl Client {
     /// connect to server
     ///

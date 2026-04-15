@@ -20,7 +20,7 @@ use chacha20poly1305::{
 };
 use data::{JsonResponse, SocketCommand};
 use futures::StreamExt;
-pub use handle::ClashStatus;
+pub use handle::ClashRunInfo;
 use handle::{get_clash, get_logs, get_version, start_clash, stop_clash};
 use hkdf::Hkdf;
 use parking_lot::Mutex;
@@ -36,7 +36,7 @@ use windows_service::{
 };
 use x25519_dalek::{PublicKey, StaticSecret};
 
-use crate::{DEFAULT_SERVER_ID, KEY_INFO, SERVICE_NAME};
+use crate::{DEFAULT_SERVER_ID, KEY_INFO};
 
 macro_rules! wrap_response {
     ($expr: expr) => {
@@ -160,13 +160,14 @@ pub async fn run_service(server_id: Option<String>, psk: Option<&[u8]>) -> Resul
     // NOTE: comment follow windows code for debug
     // 开启服务 设置服务状态
     #[cfg(windows)]
-    let status_handle = service_control_handler::register(SERVICE_NAME, move |event| -> ServiceControlHandlerResult {
-        match event {
-            ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
-            ServiceControl::Stop => std::process::exit(0),
-            _ => ServiceControlHandlerResult::NotImplemented,
-        }
-    })?;
+    let status_handle =
+        service_control_handler::register(crate::SERVICE_NAME, move |event| -> ServiceControlHandlerResult {
+            match event {
+                ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
+                ServiceControl::Stop => std::process::exit(0),
+                _ => ServiceControlHandlerResult::NotImplemented,
+            }
+        })?;
     #[cfg(windows)]
     status_handle.set_service_status(ServiceStatus {
         service_type: crate::SERVICE_TYPE,
@@ -327,16 +328,14 @@ async fn handle_socket_command(secured: &mut SecureChannel, cmd: SocketCommand) 
         SocketCommand::GetVersion => wrap_response!(get_version())?,
         SocketCommand::GetClash => wrap_response!(get_clash())?,
         SocketCommand::GetLogs => wrap_response!(get_logs())?,
-        SocketCommand::StartClash(body) => wrap_response!(start_clash(body))?,
+        SocketCommand::StartClash(body) => wrap_response!(start_clash(body).await)?,
         SocketCommand::StopClash => {
             #[cfg(unix)]
             let socket_path = {
-                use crate::service::handle::ClashStatus;
-
-                let clash_status = ClashStatus::global().lock().clone();
-                clash_status.info.and_then(|i| i.socket_path)
+                let clash_status = handle::ClashStatus::global();
+                clash_status.info.lock().clone().and_then(|i| i.socket_path)
             };
-            let res = wrap_response!(stop_clash())?;
+            let res = wrap_response!(stop_clash().await)?;
             #[cfg(unix)]
             {
                 if let Some(socket_path) = socket_path {
@@ -358,7 +357,8 @@ async fn handle_socket_command(secured: &mut SecureChannel, cmd: SocketCommand) 
 /// 停止服务
 #[cfg(windows)]
 fn stop_service() -> Result<()> {
-    let status_handle = service_control_handler::register(SERVICE_NAME, |_| ServiceControlHandlerResult::NoError)?;
+    let status_handle =
+        service_control_handler::register(crate::SERVICE_NAME, |_| ServiceControlHandlerResult::NoError)?;
     use crate::SERVICE_TYPE;
 
     status_handle.set_service_status(ServiceStatus {
@@ -373,13 +373,21 @@ fn stop_service() -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
 fn stop_service() -> Result<()> {
     // systemctl stop clash_verge_service
-
     std::process::Command::new("systemctl")
         .arg("stop")
-        .arg(SERVICE_NAME)
+        .arg(crate::SERVICE_NAME)
+        .output()?;
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn stop_service() -> Result<()> {
+    std::process::Command::new("launchctl")
+        .arg("stop")
+        .arg("io.github.clashvergeself.helper")
         .output()?;
     Ok(())
 }

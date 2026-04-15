@@ -35,7 +35,6 @@ impl Default for LogConfig {
 impl LogConfig {
     pub fn global() -> &'static Arc<Mutex<LogConfig>> {
         static LOGCONFIG: OnceCell<Arc<Mutex<LogConfig>>> = OnceCell::new();
-
         LOGCONFIG.get_or_init(|| Arc::new(Mutex::new(LogConfig::default())))
     }
 
@@ -172,26 +171,5 @@ impl LogConfig {
             .logger(mihomo_logger)
             .build(root)
             .ok()
-    }
-
-    #[allow(unused)]
-    pub fn update_log_level(&mut self, log_level: LevelFilter) -> Result<()> {
-        let handle = self.log_handle.clone();
-        if handle.is_none() {
-            bail!("update log level failed, log handle is none");
-        }
-        let config = Self::create_log_config(
-            self.log_file_name.clone().as_str(),
-            self.log_dir.clone(),
-            self.limited_file_size,
-            log_level,
-        );
-        if let Some(config) = config {
-            handle.unwrap().set_config(config);
-            self.log_level = Some(log_level);
-        } else {
-            bail!("Unable to create log config");
-        }
-        Ok(())
     }
 }
