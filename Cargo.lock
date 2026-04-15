@@ -254,7 +254,7 @@ dependencies = [
 [[package]]
 name = "clash-verge-self-utils"
 version = "0.1.0"
-source = "git+https://github.com/oomeow/clash-verge-self?branch=fix%2Fservice_run_core#9e392e1233d5e61e6afc35d187815acd9df72186"
+source = "git+https://github.com/oomeow/clash-verge-self?branch=fix%2Fservice_run_core#591b8e5f510a982bf93a5a7f82ba0a692b59334e"
 dependencies = [
  "anyhow",
  "logfmt",
@@ -931,7 +931,7 @@ dependencies = [
 [[package]]
 name = "process_supervisor"
 version = "0.1.0"
-source = "git+https://github.com/oomeow/clash-verge-self?branch=fix%2Fservice_run_core#9e392e1233d5e61e6afc35d187815acd9df72186"
+source = "git+https://github.com/oomeow/clash-verge-self?branch=fix%2Fservice_run_core#591b8e5f510a982bf93a5a7f82ba0a692b59334e"
 dependencies = [
  "parking_lot",
  "sysinfo",
