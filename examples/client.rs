@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
-use clash_verge_self_service::model::{ClashInfo, ServiceVersionInfo, SocketCommand, StartBody};
+use clash_verge_self_service::model::{ClashRunInfo, ServiceVersionInfo, SocketCommand, StartBody};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -55,7 +55,7 @@ async fn stop_core(client: &mut clash_verge_self_service::Client) -> Result<()> 
 }
 
 async fn get_clash(client: &mut clash_verge_self_service::Client) -> Result<()> {
-    let msg = client.send::<ClashInfo>(SocketCommand::GetClash).await?;
+    let msg = client.send::<ClashRunInfo>(SocketCommand::GetClash).await?;
     println!("get clash: {:#?}", msg);
     Ok(())
 }

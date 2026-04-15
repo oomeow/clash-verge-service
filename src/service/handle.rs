@@ -113,7 +113,7 @@ pub async fn stop_clash() -> Result<()> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ClashInfo {
+pub struct ClashRunInfo {
     info: Option<StartBody>,
     is_running: bool,
     pid: Option<u32>,
@@ -121,7 +121,7 @@ pub struct ClashInfo {
 }
 
 /// 获取 clash 当前执行信息
-pub fn get_clash() -> Result<ClashInfo> {
+pub fn get_clash() -> Result<ClashRunInfo> {
     let clash_status = ClashStatus::global();
     let info = clash_status.info.lock().clone();
     let pid = clash_status.sidecar.pid();
@@ -130,7 +130,7 @@ pub fn get_clash() -> Result<ClashInfo> {
     if info.is_none() || !is_running {
         bail!("clash not executed");
     }
-    Ok(ClashInfo {
+    Ok(ClashRunInfo {
         info,
         pid,
         is_running,

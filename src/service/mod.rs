@@ -20,7 +20,7 @@ use chacha20poly1305::{
 };
 use data::{JsonResponse, SocketCommand};
 use futures::StreamExt;
-pub use handle::ClashInfo;
+pub use handle::ClashRunInfo;
 use handle::{get_clash, get_logs, get_version, start_clash, stop_clash};
 use hkdf::Hkdf;
 use parking_lot::Mutex;
