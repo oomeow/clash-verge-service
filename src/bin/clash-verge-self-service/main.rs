@@ -40,8 +40,6 @@ enum Commands {
 /// used to store the server_id resolved by the clap
 #[cfg(windows)]
 static SERVER_ID: OnceCell<Option<String>> = OnceCell::new();
-#[cfg(windows)]
-static SERVER_PSK: OnceCell<Option<Vec<u8>>> = OnceCell::new();
 
 #[cfg(windows)]
 define_windows_service!(ffi_service_main, my_service_main);
