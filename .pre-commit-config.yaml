@@ -1,35 +1,32 @@
 fail_fast: true
 
-repos: # this will check typos and fix file automatically, but need to re-add file by using git
+repos:
   - repo: https://github.com/crate-ci/typos
-    rev: v1.36.2
+    rev: v1.44.0
     hooks:
       - id: typos
+
   - repo: local
     hooks:
       - id: cargo-fmt
-        name: cargo fmt
-        description: Format files with rustfmt.
-        entry: cargo +nightly fmt -- --check
+        name: cargo nightly fmt
+        entry: cargo +nightly fmt --
         language: system
-        types:
-          - rust
-        files: \.rs$
+        types: [rust]
+        pass_filenames: false # This makes it a lot faster
+
       - id: cargo-check
         name: cargo check
         description: Check the package for errors.
         entry: cargo check --all
         language: system
-        types:
-          - rust
-        files: \.rs$
-        pass_filenames: false
+        types: [rust]
+        pass_filenames: false # This makes it a lot faster
+
       - id: cargo-clippy
         name: cargo clippy
         description: Lint rust sources
         entry: cargo clippy --all-targets --all-features --tests --benches -- -D warnings
         language: system
-        types:
-          - rust
-        files: \.rs$
-        pass_filenames: false
+        types: [rust]
+        pass_filenames: false # This makes it a lot faster

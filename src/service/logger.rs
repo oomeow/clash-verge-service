@@ -22,7 +22,7 @@ impl Logger {
         self.log_data.read().clone()
     }
 
-    pub fn set_log(&self, text: String) {
+    pub fn append_log(&self, text: String) {
         let mut logs = self.log_data.write();
         if logs.len() > LOGS_QUEUE_LEN {
             logs.pop_front();

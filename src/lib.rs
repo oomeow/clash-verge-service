@@ -8,7 +8,7 @@ use serde::de::DeserializeOwned;
 use tipsy::ServerId;
 
 pub mod model {
-    pub use super::service::{ClashStatus, data::*};
+    pub use super::service::{ClashInfo, data::*};
 }
 
 #[cfg(windows)]
