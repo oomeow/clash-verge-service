@@ -160,13 +160,14 @@ pub async fn run_service(server_id: Option<String>, psk: Option<&[u8]>) -> Resul
     // NOTE: comment follow windows code for debug
     // 开启服务 设置服务状态
     #[cfg(windows)]
-    let status_handle = service_control_handler::register(SERVICE_NAME, move |event| -> ServiceControlHandlerResult {
-        match event {
-            ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
-            ServiceControl::Stop => std::process::exit(0),
-            _ => ServiceControlHandlerResult::NotImplemented,
-        }
-    })?;
+    let status_handle =
+        service_control_handler::register(crate::SERVICE_NAME, move |event| -> ServiceControlHandlerResult {
+            match event {
+                ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
+                ServiceControl::Stop => std::process::exit(0),
+                _ => ServiceControlHandlerResult::NotImplemented,
+            }
+        })?;
     #[cfg(windows)]
     status_handle.set_service_status(ServiceStatus {
         service_type: crate::SERVICE_TYPE,
@@ -356,7 +357,8 @@ async fn handle_socket_command(secured: &mut SecureChannel, cmd: SocketCommand) 
 /// 停止服务
 #[cfg(windows)]
 fn stop_service() -> Result<()> {
-    let status_handle = service_control_handler::register(SERVICE_NAME, |_| ServiceControlHandlerResult::NoError)?;
+    let status_handle =
+        service_control_handler::register(crate::SERVICE_NAME, |_| ServiceControlHandlerResult::NoError)?;
     use crate::SERVICE_TYPE;
 
     status_handle.set_service_status(ServiceStatus {
