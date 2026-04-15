@@ -29,7 +29,6 @@ pub const PSK: &[u8] = b"verge-self-service-psk";
 
 pub struct Client(SecureChannel);
 
-#[allow(dead_code)]
 impl Client {
     /// connect to server
     ///
