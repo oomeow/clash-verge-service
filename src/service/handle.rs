@@ -89,9 +89,8 @@ async fn run_core(body: StartBody) -> Result<()> {
     Ok(())
 }
 
-/// 启动clash进程
+/// 启动 clash 进程
 pub async fn start_clash(body: StartBody) -> Result<()> {
-    // stop the old clash bin
     log::debug!("start clash {body:?}");
     stop_clash().await?;
     {
@@ -104,7 +103,7 @@ pub async fn start_clash(body: StartBody) -> Result<()> {
     Ok(())
 }
 
-/// 停止clash进程
+/// 停止 clash 进程
 pub async fn stop_clash() -> Result<()> {
     log::debug!("stop clash");
     let clash_status = ClashStatus::global();
@@ -121,7 +120,7 @@ pub struct ClashInfo {
     restart_count: usize,
 }
 
-/// 获取clash当前执行信息
+/// 获取 clash 当前执行信息
 pub fn get_clash() -> Result<ClashInfo> {
     let clash_status = ClashStatus::global();
     let info = clash_status.info.lock().clone();
