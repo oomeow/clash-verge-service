@@ -1,12 +1,11 @@
 use std::{collections::VecDeque, ffi::OsString, sync::Arc, time::Duration};
 
 use anyhow::{Result, bail};
+use clash_verge_self_utils::format_mihomo_log_line;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use process_supervisor::{ProcessEvent, ProcessLogConfig, ProcessSpec, ProcessSupervisor, RestartPolicy};
-use regex::Regex;
 use serde::{Deserialize, Serialize};
-use sysinfo::System;
 
 use super::data::*;
 use crate::service::logger::Logger;
@@ -32,15 +31,10 @@ impl ClashStatus {
     fn handle_sidecar_event(event: ProcessEvent) {
         match event {
             ProcessEvent::Stdout { line, .. } | ProcessEvent::Stderr { line, .. } => {
-                wrap_mihomo_log(&line);
                 Logger::global().append_log(line);
             }
-            ProcessEvent::RestartLimitReached { attempts, .. } => {
+            ProcessEvent::RestartLimitReached { .. } => {
                 log::error!("recover clash core count exceeded, skip");
-                Logger::global().append_log(format!("mihomo core restart limit reached after {attempts} retries"));
-            }
-            ProcessEvent::Error { message, .. } => {
-                Logger::global().append_log(message);
             }
             _ => {}
         }
@@ -88,27 +82,11 @@ async fn run_core(body: StartBody) -> Result<()> {
     spec.log_config = ProcessLogConfig {
         log_file: Some(log_file.into()),
         truncate_on_start: false,
+        line_format: Some(Arc::new(format_mihomo_log_line)),
     };
     ClashStatus::global().sidecar.start(spec).await?;
 
     Ok(())
-}
-
-/// wrap mihomo log to log::info, log::warn, log::error
-fn wrap_mihomo_log(line: &str) {
-    let re = Regex::new(r"level=(\w+)").unwrap();
-    let level = re
-        .captures(line)
-        .and_then(|caps| caps.get(1))
-        .map(|m| m.as_str())
-        .unwrap_or("info");
-    match level {
-        "error" => log::error!(target: "mihomo", "[mihomo] {line}"),
-        "warning" => log::warn!(target: "mihomo", "[mihomo] {line}"),
-        "info" => log::info!(target: "mihomo", "[mihomo] {line}"),
-        "debug" => log::debug!(target: "mihomo", "[mihomo] {line}"),
-        _ => log::debug!(target: "mihomo", "[mihomo] {line}"),
-    }
 }
 
 /// 启动clash进程
@@ -120,15 +98,6 @@ pub async fn start_clash(body: StartBody) -> Result<()> {
         let clash_status = ClashStatus::global();
         *clash_status.info.lock() = Some(body.clone());
     }
-    // get log file path and init log config
-    // let log_file_path = body.log_file.clone();
-    // let log_file_path = PathBuf::from(log_file_path);
-    // let log_dir = log_file_path.parent().unwrap().to_path_buf();
-    // let log_file_name = log_file_path.file_name().unwrap().to_str().unwrap();
-
-    // log::debug!("update log config");
-    // LogConfig::global().lock().update_config(log_file_name, log_dir, None)?;
-
     log::debug!("run clash core");
     run_core(body).await?;
 
@@ -139,19 +108,8 @@ pub async fn start_clash(body: StartBody) -> Result<()> {
 pub async fn stop_clash() -> Result<()> {
     log::debug!("stop clash");
     let clash_status = ClashStatus::global();
-    if clash_status.sidecar.is_running() {
-        clash_status.sidecar.stop().await?;
-    }
+    clash_status.sidecar.stop().await?;
     Logger::global().clear_log();
-
-    let mut system = System::new();
-    system.refresh_all();
-    let procs = system.processes_by_name("verge-mihomo".as_ref());
-    log::debug!("force kill verge-mihomo process");
-    for proc in procs {
-        log::debug!("kill {}", proc.name().display());
-        proc.kill();
-    }
     Ok(())
 }
 
@@ -159,17 +117,26 @@ pub async fn stop_clash() -> Result<()> {
 pub struct ClashInfo {
     info: Option<StartBody>,
     is_running: bool,
+    pid: Option<u32>,
+    restart_count: usize,
 }
 
 /// 获取clash当前执行信息
 pub fn get_clash() -> Result<ClashInfo> {
     let clash_status = ClashStatus::global();
     let info = clash_status.info.lock().clone();
+    let pid = clash_status.sidecar.pid();
+    let restart_count = clash_status.sidecar.restart_count();
     let is_running = clash_status.sidecar.is_running();
     if info.is_none() || !is_running {
         bail!("clash not executed");
     }
-    Ok(ClashInfo { info, is_running })
+    Ok(ClashInfo {
+        info,
+        pid,
+        is_running,
+        restart_count,
+    })
 }
 
 /// 获取 logs

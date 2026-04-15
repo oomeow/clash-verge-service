@@ -12,9 +12,8 @@ pub struct Logger {
 impl Logger {
     pub fn global() -> &'static Logger {
         static LOGGER: OnceCell<Logger> = OnceCell::new();
-
         LOGGER.get_or_init(|| Logger {
-            log_data: Arc::new(RwLock::new(VecDeque::with_capacity(LOGS_QUEUE_LEN + 10))),
+            log_data: Arc::new(RwLock::new(VecDeque::with_capacity(LOGS_QUEUE_LEN))),
         })
     }
 
