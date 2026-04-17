@@ -4,9 +4,8 @@ mod logger;
 
 use std::{
     collections::HashSet,
-    path::PathBuf,
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use anyhow::{Result, anyhow};
@@ -18,13 +17,12 @@ use chacha20poly1305::{
         rand_core::{self, RngCore},
     },
 };
-use data::{JsonResponse, SocketCommand};
-use futures::StreamExt;
+use data::{ClaimBody, ClaimInfo, ClientAuthBody, JsonResponse, SocketCommand};
 pub use handle::ClashRunInfo;
 use handle::{get_clash, get_logs, get_version, start_clash, stop_clash};
 use hkdf::Hkdf;
 use parking_lot::Mutex;
-use tipsy::{Connection, Endpoint, IntoIpcPath, OnConflict, SecurityAttributes, ServerId};
+use sha2::{Digest, Sha256};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::watch::{Sender, channel},
@@ -36,7 +34,16 @@ use windows_service::{
 };
 use x25519_dalek::{PublicKey, StaticSecret};
 
-use crate::{DEFAULT_SERVER_ID, KEY_INFO};
+use crate::{
+    DEFAULT_SERVER_ID, KEY_INFO, auth,
+    ipc::{self, Connection},
+    process_identity, runtime,
+};
+
+const CLIENT_ID_LEN: usize = 16;
+const SESSION_TOKEN_LEN: usize = 32;
+const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
+const CLIENT_LEASE_TTL: Duration = Duration::from_secs(15);
 
 macro_rules! wrap_response {
     ($expr: expr) => {
@@ -53,6 +60,186 @@ macro_rules! wrap_response {
             }),
         }
     };
+}
+
+#[derive(Clone)]
+struct ClientLease {
+    inner: Arc<Mutex<Option<ActiveClient>>>,
+    heartbeat_interval: Duration,
+    ttl: Duration,
+    auth_secret_hash: [u8; 32],
+}
+
+struct ActiveClient {
+    client_id: Vec<u8>,
+    token_hash: [u8; 32],
+    expires_at: Instant,
+}
+
+#[derive(Default)]
+struct ConnectionClaim {
+    client_id: Option<Vec<u8>>,
+    session_token: Option<Vec<u8>>,
+}
+
+impl ClientLease {
+    fn new(heartbeat_interval: Duration, ttl: Duration, auth_secret: Vec<u8>) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(None)),
+            heartbeat_interval,
+            ttl,
+            auth_secret_hash: hash_secret(&auth_secret),
+        }
+    }
+
+    fn claim(&self, body: ClaimBody) -> Result<ClaimInfo> {
+        validate_client_id(&body.client_id)?;
+        auth::validate_auth_key(&body.auth_secret)?;
+        if !constant_time_eq(&hash_secret(&body.auth_secret), &self.auth_secret_hash) {
+            return Err(anyhow!("invalid IPC auth secret"));
+        }
+        if let Some(token) = body.session_token.as_deref() {
+            validate_session_token(token)?;
+        }
+
+        let mut active = self.inner.lock();
+        self.clear_expired_locked(&mut active);
+
+        if let Some(current) = active.as_mut() {
+            if let Some(token) = body.session_token {
+                let token_hash = hash_session_token(&token);
+                if current.client_id == body.client_id && current.token_hash == token_hash {
+                    current.expires_at = Instant::now() + self.ttl;
+                    return Ok(self.claim_info(body.client_id, token));
+                }
+            }
+
+            return Err(anyhow!("another client is already connected"));
+        }
+
+        let token = generate_session_token();
+        *active = Some(ActiveClient {
+            client_id: body.client_id.clone(),
+            token_hash: hash_session_token(&token),
+            expires_at: Instant::now() + self.ttl,
+        });
+        Ok(self.claim_info(body.client_id, token))
+    }
+
+    fn heartbeat(&self, body: &ClientAuthBody) -> Result<()> {
+        validate_client_id(&body.client_id)?;
+        validate_session_token(&body.session_token)?;
+
+        let mut active = self.inner.lock();
+        self.clear_expired_locked(&mut active);
+
+        let current = active.as_mut().ok_or_else(|| anyhow!("client lease is not active"))?;
+        if current.client_id != body.client_id || current.token_hash != hash_session_token(&body.session_token) {
+            return Err(anyhow!("invalid client lease"));
+        }
+
+        current.expires_at = Instant::now() + self.ttl;
+        Ok(())
+    }
+
+    fn release(&self, body: &ClientAuthBody) -> Result<()> {
+        self.heartbeat(body)?;
+        *self.inner.lock() = None;
+        Ok(())
+    }
+
+    fn claim_info(&self, client_id: Vec<u8>, session_token: Vec<u8>) -> ClaimInfo {
+        ClaimInfo {
+            client_id,
+            session_token,
+            heartbeat_interval_ms: self.heartbeat_interval.as_millis() as u64,
+            lease_ttl_ms: self.ttl.as_millis() as u64,
+        }
+    }
+
+    fn clear_expired_locked(&self, active: &mut Option<ActiveClient>) {
+        if active
+            .as_ref()
+            .is_some_and(|current| current.expires_at <= Instant::now())
+        {
+            *active = None;
+        }
+    }
+}
+
+impl ConnectionClaim {
+    fn set(&mut self, claim: &ClaimInfo) {
+        self.client_id = Some(claim.client_id.clone());
+        self.session_token = Some(claim.session_token.clone());
+    }
+
+    fn ensure_active(&self, lease: &ClientLease) -> Result<()> {
+        let client_id = self
+            .client_id
+            .clone()
+            .ok_or_else(|| anyhow!("client must claim service before sending commands"))?;
+        let session_token = self
+            .session_token
+            .clone()
+            .ok_or_else(|| anyhow!("client must claim service before sending commands"))?;
+        lease.heartbeat(&ClientAuthBody {
+            client_id,
+            session_token,
+        })
+    }
+
+    fn clear(&mut self) {
+        self.client_id = None;
+        self.session_token = None;
+    }
+}
+
+fn validate_client_id(client_id: &[u8]) -> Result<()> {
+    if client_id.len() != CLIENT_ID_LEN {
+        return Err(anyhow!(
+            "invalid client id length: expected {} bytes, got {} bytes",
+            CLIENT_ID_LEN,
+            client_id.len()
+        ));
+    }
+    Ok(())
+}
+
+fn validate_session_token(token: &[u8]) -> Result<()> {
+    if token.len() != SESSION_TOKEN_LEN {
+        return Err(anyhow!(
+            "invalid session token length: expected {} bytes, got {} bytes",
+            SESSION_TOKEN_LEN,
+            token.len()
+        ));
+    }
+    Ok(())
+}
+
+fn generate_session_token() -> Vec<u8> {
+    let mut token = vec![0u8; SESSION_TOKEN_LEN];
+    OsRng.fill_bytes(&mut token);
+    token
+}
+
+fn hash_session_token(token: &[u8]) -> [u8; 32] {
+    Sha256::digest(token).into()
+}
+
+fn hash_secret(secret: &[u8]) -> [u8; 32] {
+    Sha256::digest(secret).into()
+}
+
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+
+    let mut diff = 0u8;
+    for (left, right) in left.iter().zip(right) {
+        diff |= left ^ right;
+    }
+    diff == 0
 }
 
 pub struct SecureChannel {
@@ -156,7 +343,7 @@ impl SecureChannel {
 }
 
 /// The Service
-pub async fn run_service(server_id: Option<String>, psk: Option<&[u8]>) -> Result<()> {
+pub async fn run_service(server_id: Option<String>) -> Result<()> {
     // NOTE: comment follow windows code for debug
     // 开启服务 设置服务状态
     #[cfg(windows)]
@@ -180,35 +367,24 @@ pub async fn run_service(server_id: Option<String>, psk: Option<&[u8]>) -> Resul
     })?;
 
     let server_id = server_id.unwrap_or(DEFAULT_SERVER_ID.to_string());
-    let temp_dir = if cfg!(windows) {
-        std::env::temp_dir()
-    } else {
-        PathBuf::from("/tmp")
-    };
-    log::info!("temp_dir: {}", temp_dir.display());
-    let path = ServerId::new(server_id).parent_folder(temp_dir);
-    log::info!("socket path: {}", path.clone().into_ipc_path()?.display());
-    let security_attributes = SecurityAttributes::allow_everyone_connect()?;
-    let incoming = Endpoint::new(path, OnConflict::Overwrite)?
-        .security_attributes(security_attributes)
-        .incoming()?;
-    futures::pin_mut!(incoming);
+    let mut incoming = ipc::bind(server_id)?;
+    log::info!("IPC path: {}", incoming.path().display());
 
+    let auth_secret = auth::load_or_create_auth_key()?;
     let (shutdown_tx, mut shutdown_rx) = channel(());
+    let client_lease = ClientLease::new(HEARTBEAT_INTERVAL, CLIENT_LEASE_TTL, auth_secret);
 
     tokio::select! {
          _ = async {
-            while let Some(result) = incoming.next().await {
-                match result {
-                    Ok(stream) => {
-                        log::info!("handshake server");
-                        let secured = SecureChannel::handshake_server(stream, psk).await?;
-                        log::info!("receive client request");
-                        spawn_read_task(secured, shutdown_tx.clone()).await;
-                    }
-                    _ => unreachable!("ideally")
-                }
+            loop {
+                let stream = incoming.accept().await?;
+                process_identity::verify_connection_identity(&stream)?;
+                log::info!("handshake server");
+                let secured = SecureChannel::handshake_server(stream).await?;
+                log::info!("receive client request");
+                spawn_read_task(secured, client_lease.clone(), shutdown_tx.clone()).await;
             }
+            #[allow(unreachable_code)]
             Result::<()>::Ok(())
         } => { }
         _ = shutdown_rx.changed() => {
@@ -225,7 +401,7 @@ pub async fn run_service(server_id: Option<String>, psk: Option<&[u8]>) -> Resul
 }
 
 impl SecureChannel {
-    pub async fn handshake_server(mut stream: Connection, psk: Option<&[u8]>) -> Result<SecureChannel> {
+    pub async fn handshake_server(mut stream: Connection) -> Result<SecureChannel> {
         let server_secret = StaticSecret::random_from_rng(rand_core::OsRng);
         let server_pub = PublicKey::from(&server_secret);
 
@@ -236,11 +412,7 @@ impl SecureChannel {
         stream.write_all(server_pub.as_bytes()).await?;
 
         let shared = server_secret.diffie_hellman(&client_pub);
-        // derive symmetric key via HKDF-SHA256, mix in PSK as salt if provided
-        let hk = match psk {
-            Some(salt) => Hkdf::<sha2::Sha256>::new(Some(salt), shared.as_bytes()),
-            None => Hkdf::<sha2::Sha256>::new(None, shared.as_bytes()),
-        };
+        let hk = Hkdf::<sha2::Sha256>::new(None, shared.as_bytes());
         let mut key = [0u8; 32];
         hk.expand(KEY_INFO, &mut key)
             .map_err(|_| anyhow!("hkdf expand failed"))?;
@@ -254,7 +426,7 @@ impl SecureChannel {
         })
     }
 
-    pub async fn handshake_client(mut stream: Connection, psk: Option<&[u8]>) -> Result<SecureChannel> {
+    pub async fn handshake_client(mut stream: Connection) -> Result<SecureChannel> {
         let client_secret = StaticSecret::random_from_rng(rand_core::OsRng);
         let client_pub = PublicKey::from(&client_secret);
 
@@ -265,11 +437,7 @@ impl SecureChannel {
         let server_pub = PublicKey::from(server_pub_bytes);
 
         let shared = client_secret.diffie_hellman(&server_pub);
-        // derive symmetric key via HKDF-SHA256, mix in PSK as salt if provided
-        let hk = match psk {
-            Some(salt) => Hkdf::<sha2::Sha256>::new(Some(salt), shared.as_bytes()),
-            None => Hkdf::<sha2::Sha256>::new(None, shared.as_bytes()),
-        };
+        let hk = Hkdf::<sha2::Sha256>::new(None, shared.as_bytes());
         let mut key = [0u8; 32];
         hk.expand(KEY_INFO, &mut key)
             .map_err(|_| anyhow!("hkdf expand failed"))?;
@@ -284,8 +452,9 @@ impl SecureChannel {
     }
 }
 
-async fn spawn_read_task(mut secured: SecureChannel, shutdown_tx: Sender<()>) {
-    tokio::spawn(async move {
+async fn spawn_read_task(mut secured: SecureChannel, client_lease: ClientLease, shutdown_tx: Sender<()>) {
+    runtime::spawn(async move {
+        let mut connection_claim = ConnectionClaim::default();
         while let Ok(msg) = secured.recv().await {
             let send_error_resp = async |secured: &mut SecureChannel, e: anyhow::Result<()>| {
                 log::info!("send error response to back");
@@ -304,9 +473,12 @@ async fn spawn_read_task(mut secured: SecureChannel, shutdown_tx: Sender<()>) {
                 }
             };
 
-            if let Err(err) = handle_socket_command(&mut secured, cmd.clone()).await {
+            if let Err(err) =
+                handle_socket_command(&mut secured, &client_lease, &mut connection_claim, cmd.clone()).await
+            {
                 log::error!("Error handling socket command: {err}");
                 send_error_resp(&mut secured, Err(anyhow!("Error handling socket command: {err}"))).await?;
+                continue;
             };
 
             if let SocketCommand::StopService = cmd {
@@ -322,9 +494,37 @@ async fn spawn_read_task(mut secured: SecureChannel, shutdown_tx: Sender<()>) {
 }
 
 /// handle socket command and write response message
-async fn handle_socket_command(secured: &mut SecureChannel, cmd: SocketCommand) -> Result<()> {
+async fn handle_socket_command(
+    secured: &mut SecureChannel,
+    client_lease: &ClientLease,
+    connection_claim: &mut ConnectionClaim,
+    cmd: SocketCommand,
+) -> Result<()> {
     log::info!("Handling socket command: {cmd:?}");
+    if !matches!(
+        &cmd,
+        SocketCommand::ClaimClient(_) | SocketCommand::Heartbeat(_) | SocketCommand::ReleaseClient(_)
+    ) {
+        connection_claim.ensure_active(client_lease)?;
+    }
+
     let response = match cmd {
+        SocketCommand::ClaimClient(body) => {
+            let claim = client_lease.claim(body)?;
+            connection_claim.set(&claim);
+            wrap_response!(Result::<ClaimInfo>::Ok(claim))?
+        }
+        SocketCommand::Heartbeat(body) => {
+            client_lease.heartbeat(&body)?;
+            connection_claim.client_id = Some(body.client_id);
+            connection_claim.session_token = Some(body.session_token);
+            wrap_response!(Result::<()>::Ok(()))?
+        }
+        SocketCommand::ReleaseClient(body) => {
+            client_lease.release(&body)?;
+            connection_claim.clear();
+            wrap_response!(Result::<()>::Ok(()))?
+        }
         SocketCommand::GetVersion => wrap_response!(get_version())?,
         SocketCommand::GetClash => wrap_response!(get_clash())?,
         SocketCommand::GetLogs => wrap_response!(get_logs())?,

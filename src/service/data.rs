@@ -4,12 +4,36 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum SocketCommand {
+    ClaimClient(ClaimBody),
+    Heartbeat(ClientAuthBody),
+    ReleaseClient(ClientAuthBody),
     GetVersion,
     GetClash,
     GetLogs,
     StartClash(StartBody),
     StopClash,
     StopService,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ClaimBody {
+    pub client_id: Vec<u8>,
+    pub auth_secret: Vec<u8>,
+    pub session_token: Option<Vec<u8>>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ClientAuthBody {
+    pub client_id: Vec<u8>,
+    pub session_token: Vec<u8>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ClaimInfo {
+    pub client_id: Vec<u8>,
+    pub session_token: Vec<u8>,
+    pub heartbeat_interval_ms: u64,
+    pub lease_ttl_ms: u64,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

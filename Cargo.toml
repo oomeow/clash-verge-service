@@ -19,10 +19,10 @@ tokio = { version = "1", default-features = false, features = [
     "rt-multi-thread",
     "io-util",
     "sync",
-    "signal"
+    "signal",
+    "net",
+    "time"
 ] }
-tipsy = "0.7"
-futures = "0.3"
 chrono = {version = "0.4",features = ["serde"]}
 clap = { version = "4.5", features = ["derive"] }
 
@@ -31,6 +31,8 @@ chacha20poly1305 = "0.10"
 hkdf = "0.12"
 x25519-dalek = { version = "2.0", features = ["static_secrets"] }
 sha2 = "0.10"
+keyring = { version = "3.6", default-features = false, features = ["apple-native", "windows-native", "sync-secret-service"] }
+libc = "0.2"
 
 process_supervisor = { git = "https://github.com/oomeow/clash-verge-self", package = "process_supervisor" }
 clash-verge-self-utils = { git = "https://github.com/oomeow/clash-verge-self", package = "clash-verge-self-utils" }
@@ -40,9 +42,17 @@ openssl = { version = "0.10", features = ["vendored"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-service = "0.8"
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
+] }
 
 [profile.release]
 panic = "abort"
 codegen-units = 1
 lto = true
 opt-level = "s"
+strip = true

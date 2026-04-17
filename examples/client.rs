@@ -1,39 +1,53 @@
-#![allow(unused)]
-use std::{
-    thread,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use anyhow::Result;
-use clash_verge_self_service::model::{ClashRunInfo, ServiceVersionInfo, SocketCommand, StartBody};
+use clash_verge_self_service::{
+    Client,
+    model::{ClashRunInfo, ServiceVersionInfo, SocketCommand, StartBody},
+};
+
+const SERVER_ID: &str = "hello-secured-ipc-dev";
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let server_id = "hello-secured-ipc-dev";
-    let mut client = clash_verge_self_service::Client::connect(server_id, Some(clash_verge_self_service::PSK)).await?;
-    // check version
+    let client = Client::connect(SERVER_ID).await?;
+    println!(
+        "connected and claimed service, heartbeat: {:?}, lease ttl: {:?}",
+        client.heartbeat_interval(),
+        client.lease_ttl()
+    );
+
+    let result = demo_flow(&client).await;
+    let release_result = client.release().await;
+
+    if let Err(err) = release_result {
+        eprintln!("release client failed: {err}");
+    }
+
+    result
+}
+
+async fn demo_flow(client: &Client) -> Result<()> {
     let now = Instant::now();
     for _ in 0..=2000 {
-        get_version(&mut client).await?;
+        get_version(client).await?;
     }
-    println!("took: {}ms", now.elapsed().as_millis());
+    println!("get version x2001 took: {}ms", now.elapsed().as_millis());
 
-    // start core
-    start_core(&mut client).await?;
+    start_core(client).await?;
     tokio::time::sleep(Duration::from_secs(5)).await;
-    get_clash(&mut client).await?;
-    get_logs(&mut client).await?;
+    get_clash(client).await?;
+    get_logs(client).await?;
 
     tokio::time::sleep(Duration::from_secs(5)).await;
-    // stop core
-    stop_core(&mut client).await?;
-    get_clash(&mut client).await?;
-    get_logs(&mut client).await?;
+    stop_core(client).await?;
+    get_clash(client).await?;
+    get_logs(client).await?;
 
     Ok(())
 }
 
-async fn start_core(client: &mut clash_verge_self_service::Client) -> Result<()> {
+async fn start_core(client: &Client) -> Result<()> {
     let curr_dir = std::env::current_dir()?;
     let start_core = StartBody {
         core_type: Some("mihomo".into()),
@@ -48,25 +62,25 @@ async fn start_core(client: &mut clash_verge_self_service::Client) -> Result<()>
     Ok(())
 }
 
-async fn stop_core(client: &mut clash_verge_self_service::Client) -> Result<()> {
+async fn stop_core(client: &Client) -> Result<()> {
     let msg = client.send::<()>(SocketCommand::StopClash).await?;
     println!("stop clash: {:?}", msg);
     Ok(())
 }
 
-async fn get_clash(client: &mut clash_verge_self_service::Client) -> Result<()> {
+async fn get_clash(client: &Client) -> Result<()> {
     let msg = client.send::<ClashRunInfo>(SocketCommand::GetClash).await?;
     println!("get clash: {:#?}", msg);
     Ok(())
 }
 
-async fn get_logs(client: &mut clash_verge_self_service::Client) -> Result<()> {
+async fn get_logs(client: &Client) -> Result<()> {
     let msg = client.send::<Vec<String>>(SocketCommand::GetLogs).await?;
     println!("get logs: {:?}", msg);
     Ok(())
 }
 
-async fn get_version(client: &mut clash_verge_self_service::Client) -> Result<()> {
+async fn get_version(client: &Client) -> Result<()> {
     let msg = client.send::<ServiceVersionInfo>(SocketCommand::GetVersion).await?;
     println!("get version: {:?}", msg);
     Ok(())

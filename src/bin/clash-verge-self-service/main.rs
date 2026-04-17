@@ -47,14 +47,11 @@ define_windows_service!(ffi_service_main, my_service_main);
 #[cfg(windows)]
 pub fn my_service_main(_arguments: Vec<std::ffi::OsString>) {
     // this arguments is not same as launch arguments
-    if let Ok(rt) = tokio::runtime::Runtime::new() {
-        let server_id = SERVER_ID.get().expect("failed to get server id").clone();
-        let server_id = server_id.unwrap_or(clash_verge_self_service::DEFAULT_SERVER_ID.to_string());
-        let psk = option_env!("CLASH_VERGE_SELF_SERVICE_PSK").map_or(clash_verge_self_service::PSK, |v| v.as_bytes());
-        rt.block_on(async move {
-            let _ = clash_verge_self_service::Server::run(server_id, Some(psk)).await;
-        });
-    }
+    let server_id = SERVER_ID.get().expect("failed to get server id").clone();
+    let server_id = server_id.unwrap_or(clash_verge_self_service::DEFAULT_SERVER_ID.to_string());
+    clash_verge_self_service::runtime::block_on(async move {
+        let _ = clash_verge_self_service::Server::run(server_id).await;
+    });
 }
 
 fn main() -> anyhow::Result<()> {
@@ -74,12 +71,9 @@ fn main() -> anyhow::Result<()> {
             log::info!("Server ID: {:?}", server_id);
             #[cfg(unix)]
             {
-                let rt = tokio::runtime::Runtime::new()?;
                 let server_id = server_id.unwrap_or(clash_verge_self_service::DEFAULT_SERVER_ID.to_string());
-                let psk =
-                    option_env!("CLASH_VERGE_SELF_SERVICE_PSK").map_or(clash_verge_self_service::PSK, |v| v.as_bytes());
-                rt.block_on(async move {
-                    let _ = clash_verge_self_service::Server::run(server_id, Some(psk)).await;
+                clash_verge_self_service::runtime::block_on(async move {
+                    let _ = clash_verge_self_service::Server::run(server_id).await;
                 });
             }
             #[cfg(windows)]
