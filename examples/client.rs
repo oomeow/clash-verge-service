@@ -16,6 +16,7 @@ async fn main() -> Result<()> {
         client.heartbeat_interval(),
         client.lease_ttl()
     );
+    let client = Client::connect(SERVER_ID).await?;
 
     let result = demo_flow(&client).await;
     let release_result = client.release().await;

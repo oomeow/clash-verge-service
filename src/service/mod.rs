@@ -67,7 +67,6 @@ struct ClientLease {
     inner: Arc<Mutex<Option<ActiveClient>>>,
     heartbeat_interval: Duration,
     ttl: Duration,
-    auth_secret_hash: [u8; 32],
 }
 
 struct ActiveClient {
@@ -83,19 +82,19 @@ struct ConnectionClaim {
 }
 
 impl ClientLease {
-    fn new(heartbeat_interval: Duration, ttl: Duration, auth_secret: Vec<u8>) -> Self {
+    fn new(heartbeat_interval: Duration, ttl: Duration) -> Self {
         Self {
             inner: Arc::new(Mutex::new(None)),
             heartbeat_interval,
             ttl,
-            auth_secret_hash: hash_secret(&auth_secret),
         }
     }
 
     fn claim(&self, body: ClaimBody) -> Result<ClaimInfo> {
         validate_client_id(&body.client_id)?;
         auth::validate_auth_key(&body.auth_secret)?;
-        if !constant_time_eq(&hash_secret(&body.auth_secret), &self.auth_secret_hash) {
+        let stored_secret = auth::load_auth_key()?;
+        if !constant_time_eq(&hash_secret(&body.auth_secret), &hash_secret(&stored_secret)) {
             return Err(anyhow!("invalid IPC auth secret"));
         }
         if let Some(token) = body.session_token.as_deref() {
@@ -370,9 +369,8 @@ pub async fn run_service(server_id: Option<String>) -> Result<()> {
     let mut incoming = ipc::bind(server_id)?;
     log::info!("IPC path: {}", incoming.path().display());
 
-    let auth_secret = auth::load_or_create_auth_key()?;
     let (shutdown_tx, mut shutdown_rx) = channel(());
-    let client_lease = ClientLease::new(HEARTBEAT_INTERVAL, CLIENT_LEASE_TTL, auth_secret);
+    let client_lease = ClientLease::new(HEARTBEAT_INTERVAL, CLIENT_LEASE_TTL);
 
     tokio::select! {
          _ = async {
