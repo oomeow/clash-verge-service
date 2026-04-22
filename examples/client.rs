@@ -53,7 +53,7 @@ async fn start_core(client: &Client) -> Result<()> {
     let start_core = StartBody {
         core_type: Some("mihomo".into()),
         socket_path: Some("/tmp/mihomo-dev.sock".into()),
-        bin_path: "/Applications/Clash Verge Self.app/Contents/MacOS/self-mihomo".into(),
+        bin_path: "examples/mihomo/self-mihomo".into(),
         config_dir: curr_dir.join("examples/mihomo").to_str().unwrap().to_string(),
         config_file: curr_dir.join("examples/mihomo/test.yaml").to_str().unwrap().to_string(),
         log_file: curr_dir.join("examples/mihomo/test.log").to_str().unwrap().to_string(),
