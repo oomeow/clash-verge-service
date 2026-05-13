@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, ffi::OsString, sync::Arc, time::Duration};
 
 use anyhow::{Result, bail};
-use clash_verge_self_utils::format_mihomo_log_line;
+use clash_verge_self_utils::format_raw_mihomo_log_line;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use process_supervisor::{ProcessEvent, ProcessLogConfig, ProcessSpec, ProcessSupervisor, RestartPolicy};
@@ -56,10 +56,11 @@ async fn run_core(body: StartBody) -> Result<()> {
         socket_path,
         bin_path,
         config_dir,
+        pid_file,
         config_file,
         log_file,
     } = body;
-    let mut spec = ProcessSpec::new("mihomo", bin_path);
+    let mut spec = ProcessSpec::new("mihomo", bin_path).with_pid_file(pid_file);
     spec.args = vec![
         OsString::from("-d"),
         OsString::from(config_dir),
@@ -82,7 +83,7 @@ async fn run_core(body: StartBody) -> Result<()> {
     spec.log_config = ProcessLogConfig {
         log_file: Some(log_file.into()),
         truncate_on_start: false,
-        line_formatter: Some(Arc::new(format_mihomo_log_line)),
+        line_formatter: Some(Arc::new(format_raw_mihomo_log_line)),
     };
     ClashStatus::global().sidecar.start(spec).await?;
 

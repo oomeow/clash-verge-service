@@ -34,6 +34,8 @@ sha2 = "0.10"
 
 process_supervisor = { git = "https://github.com/oomeow/clash-verge-self", package = "process_supervisor" }
 clash-verge-self-utils = { git = "https://github.com/oomeow/clash-verge-self", package = "clash-verge-self-utils" }
+# process_supervisor = { path = "../clash-verge-self/crates/process_supervisor" }
+# clash-verge-self-utils = { path = "../clash-verge-self/crates/clash-verge-self-utils" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 openssl = { version = "0.10", features = ["vendored"] }

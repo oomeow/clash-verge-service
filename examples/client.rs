@@ -40,6 +40,11 @@ async fn start_core(client: &mut clash_verge_self_service::Client) -> Result<()>
         socket_path: Some("/tmp/mihomo-dev.sock".into()),
         bin_path: "/Applications/Clash Verge Self.app/Contents/MacOS/self-mihomo".into(),
         config_dir: curr_dir.join("examples/mihomo").to_str().unwrap().to_string(),
+        pid_file: curr_dir
+            .join("examples/mihomo/mihomo.pid")
+            .to_str()
+            .unwrap()
+            .to_string(),
         config_file: curr_dir.join("examples/mihomo/test.yaml").to_str().unwrap().to_string(),
         log_file: curr_dir.join("examples/mihomo/test.log").to_str().unwrap().to_string(),
     };

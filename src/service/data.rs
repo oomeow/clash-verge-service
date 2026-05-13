@@ -24,6 +24,7 @@ pub struct StartBody {
     pub socket_path: Option<String>,
     pub bin_path: String,
     pub config_dir: String,
+    pub pid_file: String,
     pub config_file: String,
     pub log_file: String,
 }
