@@ -30,7 +30,7 @@ bytes = "1.10"
 chacha20poly1305 = "0.10"
 hkdf = "0.12"
 x25519-dalek = { version = "2.0", features = ["static_secrets"] }
-sha2 = "0.10"
+sha2 = "0.11"
 
 process_supervisor = { git = "https://github.com/oomeow/clash-verge-self", package = "process_supervisor" }
 clash-verge-self-utils = { git = "https://github.com/oomeow/clash-verge-self", package = "clash-verge-self-utils" }
